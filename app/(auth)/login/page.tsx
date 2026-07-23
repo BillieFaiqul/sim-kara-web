@@ -1,16 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login, isAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard')
+    }
+  }, [isAuthenticated, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,23 +26,11 @@ export default function LoginPage() {
     setError('')
 
     try {
-      // Simulasi login (nanti ganti dengan API)
-      if (email && password) {
-        // Save to localStorage
-        localStorage.setItem('user', JSON.stringify({
-          email,
-          name: 'Admin Prodi',
-          role: 'admin',
-        }))
-        localStorage.setItem('token', 'fake-token-12345')
-
-        // Redirect ke dashboard
-        router.push('/dashboard')
-      } else {
-        setError('Email dan password harus diisi')
-      }
-    } catch (err) {
-      setError('Login gagal. Silakan coba lagi.')
+      await login(email, password)
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Login gagal. Silakan coba lagi.')
+      console.error('Login error:', err)
     } finally {
       setLoading(false)
     }
@@ -47,7 +43,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <Image
-              src="/images/logo_landscape.png"
+              src="/images/logo.png"
               alt="SIM-KARA"
               width={150}
               height={50}
@@ -79,7 +75,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@unesa.ac.id"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-700"
               required
             />
           </div>
@@ -94,7 +90,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-700"
               required
             />
           </div>
@@ -124,11 +120,12 @@ export default function LoginPage() {
         {/* Demo Info */}
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-xs text-gray-600 text-center mb-3">
-            Demo Account
+            Test Accounts (Password: password123)
           </p>
-          <div className="bg-gray-50 p-3 rounded text-xs text-gray-700 space-y-1">
-            <p><strong>Email:</strong> admin@unesa.ac.id</p>
-            <p><strong>Password:</strong> password123</p>
+          <div className="bg-gray-50 p-3 rounded text-xs text-gray-700 space-y-2">
+            <p><strong>Admin:</strong> admin@simkara.com</p>
+            <p><strong>Dosen:</strong> ahmad@simkara.com</p>
+            <p><strong>Mahasiswa:</strong> billie@simkara.com</p>
           </div>
         </div>
 

@@ -4,7 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Menu, X, LogOut, Home, FileText, CheckSquare, BarChart3, Settings, User, BookOpen, HelpCircle } from 'lucide-react'
+import {
+  Menu, X, LogOut, Home, FileText, CheckSquare, BarChart3, Settings, User, BookOpen,
+  HelpCircle, Upload, Users
+} from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 
 export default function DashboardLayout({
   children,
@@ -12,39 +16,48 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const { user, menuItems, logout, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user')
-    if (!userData) {
+    if (!isLoading && !user) {
       router.push('/login')
-    } else {
-      setUser(JSON.parse(userData))
     }
-  }, [router])
+  }, [user, isLoading, router])
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    localStorage.removeItem('token')
+  const handleLogout = async () => {
+    await logout()
     router.push('/')
   }
 
-  const menuItems = [
-    { icon: Home, label: 'Dashboard', href: '/dashboard' },
-    { icon: FileText, label: 'Karya Dosen', href: '/dashboard/karya-dosen' },
-    { icon: BookOpen, label: 'Prestasi Mahasiswa', href: '/dashboard/prestasi' },
-    { icon: CheckSquare, label: 'Validasi', href: '/dashboard/validasi' },
-    { icon: BarChart3, label: 'Monitoring', href: '/dashboard/monitoring' },
-    { icon: FileText, label: 'Laporan', href: '/dashboard/laporan' },
-    { icon: Settings, label: 'Pengaturan', href: '/dashboard/pengaturan' },
-    { icon: User, label: 'Profil', href: '/dashboard/profil' },
-    { icon: HelpCircle, label: 'Panduan', href: '/dashboard/panduan' },
-  ]
+  // Map icon names to lucide-react components
+  const iconMap: Record<string, React.ReactNode> = {
+    Home: <Home size={20} />,
+    FileText: <FileText size={20} />,
+    CheckSquare: <CheckSquare size={20} />,
+    BarChart3: <BarChart3 size={20} />,
+    Settings: <Settings size={20} />,
+    User: <User size={20} />,
+    BookOpen: <BookOpen size={20} />,
+    HelpCircle: <HelpCircle size={20} />,
+    Upload: <Upload size={20} />,
+    Users: <Users size={20} />,
+  }
 
-  if (!user) {
-    return null
+  // Convert menuItems to include icon components
+  const processedMenuItems = menuItems.map((item) => ({
+    ...item,
+    iconComponent: iconMap[item.icon] || <FileText size={20} />,
+  }))
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="mb-4">Loading...</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -76,17 +89,21 @@ export default function DashboardLayout({
 
         {/* Menu Items */}
         <nav className="flex-1 overflow-y-auto py-4">
-          {menuItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-blue-800 transition text-sm"
-              title={item.label}
-            >
-              <item.icon size={20} />
-              {sidebarOpen && <span>{item.label}</span>}
-            </Link>
-          ))}
+          {processedMenuItems.length > 0 ? (
+            processedMenuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-blue-800 transition text-sm"
+                title={item.label}
+              >
+                {item.iconComponent}
+                {sidebarOpen && <span>{item.label}</span>}
+              </Link>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-blue-200">Loading menu...</div>
+          )}
         </nav>
 
         {/* Logout */}
