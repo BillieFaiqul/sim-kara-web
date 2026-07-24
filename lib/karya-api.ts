@@ -26,6 +26,8 @@ export interface Karya {
   tahun: number
   deskripsi?: string
   file_path?: string
+  file_pendukung_path?: string
+  pencapaian?: string
   status: 'draft' | 'submitted' | 'verified' | 'rejected'
   alasan_reject?: string
   tanggal_submit?: string
@@ -126,6 +128,33 @@ class KaryaAPI {
 
   getStats(): Promise<StatsResponse> {
     return api.get('/karya-stats').then((res) => res.data)
+  }
+
+  uploadFile(formData: FormData): Promise<{ file_path: string; url: string }> {
+    return api.post('/karya/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then((res) => res.data)
+  }
+
+  createWithPath(data: {
+    judul: string
+    jenis: string
+    level: string
+    tahun: number
+    deskripsi?: string
+    pencapaian?: string
+    file_path: string
+    file_pendukung_path?: string | null
+  }): Promise<{ success: boolean; message: string; data: Karya }> {
+    return api.post('/karya', data).then((res) => res.data)
+  }
+
+  download(id: number): Promise<Blob> {
+    return api.get(`/karya/${id}/download`, {
+      responseType: 'blob',
+    }).then((res) => res.data)
   }
 }
 

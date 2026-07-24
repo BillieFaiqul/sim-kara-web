@@ -13,6 +13,7 @@ interface RecentKarya {
   user?: { name: string; role: string }
   tahun: number
   icon: string
+  authorDisplay: string
 }
 
 export default function Home() {
@@ -32,8 +33,8 @@ export default function Home() {
       setStats(statsData.stats)
       setChartData(statsData.chart_data)
 
-      // Get recent karya
-      const karyaData = await karyaAPI.getAll()
+      // Get recent verified karya (newest first)
+      const karyaData = await karyaAPI.getAll({ status: 'verified' })
       const transformed = karyaData.data.slice(0, 3).map((k: Karya) => ({
         id: k.id,
         judul: k.judul,
@@ -41,6 +42,7 @@ export default function Home() {
         user: k.user,
         tahun: k.tahun,
         icon: getIconForJenis(k.jenis),
+        authorDisplay: k.user ? `${k.user.name} - ${k.user.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}` : 'Unknown',
       }))
       setRecentKarya(transformed)
     } catch (error) {
@@ -175,8 +177,8 @@ export default function Home() {
 
                     {/* Author & Year */}
                     <div className="border-t pt-4">
-                      <p className="text-sm text-gray-600 mb-1">{karya.user?.name}</p>
-                      <p className="text-sm font-medium text-gray-500">{karya.tahun}</p>
+                      <p className="text-sm text-gray-600 mb-1 font-medium">{karya.authorDisplay}</p>
+                      <p className="text-sm text-gray-500">{karya.tahun}</p>
                     </div>
                   </div>
                 </Link>

@@ -1,22 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, AlertCircle, Loader, Download } from 'lucide-react'
 import { karyaAPI, type Karya } from '@/lib/karya-api'
 import { ConfirmModal } from '@/components/ConfirmModal'
 
-export default function PublicKaryaDetailPage() {
+export default function DetailKaryaPage() {
   const params = useParams()
+  const router = useRouter()
   const id = params.id as string
 
   const [karya, setKarya] = useState<Karya | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Modal states
   const [modal, setModal] = useState<{
     isOpen: boolean
-    type: 'error' | 'info'
+    type: 'error' | 'success'
     title: string
     message: string
   }>({
@@ -35,13 +37,7 @@ export default function PublicKaryaDetailPage() {
       setLoading(true)
       setError('')
       const response = await karyaAPI.getById(parseInt(id))
-
-      if (response.data.status !== 'verified') {
-        setError('Karya ini tidak tersedia untuk umum')
-        setKarya(null)
-      } else {
-        setKarya(response.data)
-      }
+      setKarya(response.data)
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Gagal memuat detail karya')
       console.error('Error:', err)
@@ -50,25 +46,40 @@ export default function PublicKaryaDetailPage() {
     }
   }
 
+  const statusColor: Record<string, string> = {
+    draft: 'bg-gray-100 text-gray-800',
+    submitted: 'bg-yellow-100 text-yellow-800',
+    verified: 'bg-green-100 text-green-800',
+    rejected: 'bg-red-100 text-red-800',
+  }
+
+  const statusLabel: Record<string, string> = {
+    draft: 'Draft',
+    submitted: 'Submitted',
+    verified: 'Verified',
+    rejected: 'Rejected',
+  }
+
   const handleDownload = (fileType: 'karya' | 'pendukung') => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-
-    if (!token) {
-      setModal({
-        isOpen: true,
-        type: 'info',
-        title: 'Login Diperlukan',
-        message: 'Silakan login terlebih dahulu untuk mendownload file. Klik tombol di bawah untuk login.',
-      })
-      return
-    }
-
     if (!karya) return
 
     const filePath = fileType === 'karya' ? karya.file_path : karya.file_pendukung_path
     if (!filePath) return
 
     const fileName = filePath.split('/').pop() || 'file'
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+
+    if (!token) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Login Diperlukan',
+        message: 'Silakan login terlebih dahulu untuk mendownload file',
+      })
+      return
+    }
+
+    // Download file langsung dari storage
     const downloadUrl = `http://localhost:8000/storage/${filePath}`
     const link = document.createElement('a')
     link.href = downloadUrl
@@ -83,13 +94,13 @@ export default function PublicKaryaDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 py-8">
-          <Link
-            href="/karya"
+          <button
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft size={20} />
-            Kembali ke Etalase Karya
-          </Link>
+            Kembali
+          </button>
           <div className="flex items-center justify-center py-12">
             <Loader size={24} className="animate-spin text-blue-600" />
             <p className="ml-3 text-gray-500">Loading...</p>
@@ -103,13 +114,13 @@ export default function PublicKaryaDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 py-8">
-          <Link
-            href="/karya"
+          <button
+            onClick={() => router.back()}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft size={20} />
-            Kembali ke Etalase Karya
-          </Link>
+            Kembali
+          </button>
           <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg flex gap-3">
             <AlertCircle size={20} className="flex-shrink-0" />
             <p>{error || 'Karya tidak ditemukan'}</p>
@@ -123,13 +134,13 @@ export default function PublicKaryaDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Back Button */}
-        <Link
-          href="/karya"
+        <button
+          onClick={() => router.back()}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
         >
           <ArrowLeft size={20} />
-          Kembali ke Etalase Karya
-        </Link>
+          Kembali
+        </button>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -146,8 +157,8 @@ export default function PublicKaryaDetailPage() {
                   <span className="inline-block px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
                     {karya.level}
                   </span>
-                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-                    ✓ Verified
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusColor[karya.status]}`}>
+                    {statusLabel[karya.status]}
                   </span>
                 </div>
               </div>
@@ -178,15 +189,17 @@ export default function PublicKaryaDetailPage() {
                   <p className="font-semibold text-gray-900">{karya.tahun}</p>
                 </div>
 
-                <div>
-                  <p className="text-sm text-gray-600">Pembuat</p>
-                  <p className="font-semibold text-gray-900">{karya.user?.name}</p>
-                </div>
-
                 {karya.deskripsi && (
                   <div>
                     <p className="text-sm text-gray-600">Deskripsi</p>
                     <p className="text-sm text-gray-700 line-clamp-3">{karya.deskripsi}</p>
+                  </div>
+                )}
+
+                {karya.status === 'rejected' && karya.alasan_reject && (
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <p className="text-sm font-semibold text-red-800 mb-1">Alasan Penolakan</p>
+                    <p className="text-sm text-red-700">{karya.alasan_reject}</p>
                   </div>
                 )}
               </div>
@@ -196,7 +209,8 @@ export default function PublicKaryaDetailPage() {
               {/* Metadata */}
               <div className="text-xs text-gray-500 space-y-1">
                 <p>ID: {karya.id}</p>
-                <p>Dipublikasikan: {new Date(karya.created_at).toLocaleDateString('id-ID')}</p>
+                <p>Dibuat: {new Date(karya.created_at).toLocaleDateString('id-ID')}</p>
+                <p>Diupdate: {new Date(karya.updated_at).toLocaleDateString('id-ID')}</p>
               </div>
             </div>
           </div>
@@ -251,18 +265,15 @@ export default function PublicKaryaDetailPage() {
           </div>
         </div>
 
-        {/* Login Modal */}
+        {/* Alert Modal */}
         <ConfirmModal
-          isOpen={modal.isOpen && modal.type === 'info'}
-          type="info"
+          isOpen={modal.isOpen}
+          type={modal.type}
           title={modal.title}
           message={modal.message}
-          confirmText="Login"
+          confirmText="OK"
           cancelText="Tutup"
-          onConfirm={() => {
-            setModal({ ...modal, isOpen: false })
-            window.location.href = '/login'
-          }}
+          onConfirm={() => setModal({ ...modal, isOpen: false })}
           onCancel={() => setModal({ ...modal, isOpen: false })}
         />
       </div>
@@ -299,7 +310,14 @@ function FilePreview({ filePath, fileName }: FilePreviewProps) {
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
           <AlertCircle className="text-red-500 mx-auto mb-2" size={48} />
-          <p className="text-red-600 text-sm">{error}</p>
+          <p className="text-red-600 text-sm mb-2">{error}</p>
+          <a
+            href={fileUrl}
+            download
+            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+          >
+            Download file
+          </a>
         </div>
       </div>
     )
@@ -318,7 +336,7 @@ function FilePreview({ filePath, fileName }: FilePreviewProps) {
       <iframe
         src={`${fileUrl}#toolbar=0`}
         className="w-full h-full"
-        onError={() => setError('Tidak bisa membuka PDF')}
+        onError={() => setError('Tidak bisa membuka PDF. Coba download.')}
       />
     )
   }

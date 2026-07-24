@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Download, Eye, X, AlertCircle } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Loader, Download } from 'lucide-react'
 import { karyaAPI, type Karya } from '@/lib/karya-api'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 export default function DetailKaryaPage() {
   const params = useParams()
@@ -14,8 +14,19 @@ export default function DetailKaryaPage() {
   const [karya, setKarya] = useState<Karya | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showFileViewer, setShowFileViewer] = useState(false)
-  const [fileError, setFileError] = useState('')
+
+  // Modal states
+  const [modal, setModal] = useState<{
+    isOpen: boolean
+    type: 'error' | 'success'
+    title: string
+    message: string
+  }>({
+    isOpen: false,
+    type: 'error',
+    title: '',
+    message: '',
+  })
 
   useEffect(() => {
     loadKarya()
@@ -49,19 +60,37 @@ export default function DetailKaryaPage() {
     rejected: 'Rejected',
   }
 
+  const handleDownload = (fileType: 'karya' | 'pendukung') => {
+    if (!karya) return
+
+    const filePath = fileType === 'karya' ? karya.file_path : karya.file_pendukung_path
+    if (!filePath) return
+
+    const fileName = filePath.split('/').pop() || 'file'
+    const downloadUrl = `http://localhost:8000/storage/${filePath}`
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = fileName
+    link.target = '_blank'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft size={20} />
             Kembali
           </button>
-          <div className="text-center py-12">
-            <p className="text-gray-500">Loading...</p>
+          <div className="flex items-center justify-center py-12">
+            <Loader size={24} className="animate-spin text-blue-600" />
+            <p className="ml-3 text-gray-500">Loading...</p>
           </div>
         </div>
       </div>
@@ -71,10 +100,10 @@ export default function DetailKaryaPage() {
   if (error || !karya) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6 font-medium"
           >
             <ArrowLeft size={20} />
             Kembali
@@ -90,7 +119,7 @@ export default function DetailKaryaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Back Button */}
         <button
           onClick={() => router.back()}
@@ -100,14 +129,15 @@ export default function DetailKaryaPage() {
           Kembali
         </button>
 
-        {/* Main Card */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{karya.judul}</h1>
-                <div className="flex items-center gap-4 flex-wrap">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Side: Info */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow p-6 space-y-4">
+              {/* Header */}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">{karya.judul}</h1>
+                <div className="flex flex-wrap gap-2">
                   <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                     {karya.jenis}
                   </span>
@@ -119,161 +149,144 @@ export default function DetailKaryaPage() {
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Author Info */}
-          <div className="border-t border-b border-gray-200 py-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Pembuat</p>
-                <p className="text-lg font-semibold text-gray-900">{karya.user?.name}</p>
-                <p className="text-sm text-gray-600 mt-1">{karya.user?.role}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Tahun</p>
-                <p className="text-lg font-semibold text-gray-900">{karya.tahun}</p>
-                {karya.tanggal_submit && (
-                  <p className="text-sm text-gray-600 mt-1">Disubmit: {new Date(karya.tanggal_submit).toLocaleDateString('id-ID')}</p>
+              <hr className="border-gray-200" />
+
+              {/* Details */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-gray-600">Jenis</p>
+                  <p className="font-semibold text-gray-900">{karya.jenis}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600">Level</p>
+                  <p className="font-semibold text-gray-900">{karya.level}</p>
+                </div>
+
+                {karya.pencapaian && (
+                  <div>
+                    <p className="text-sm text-gray-600">Pencapaian</p>
+                    <p className="font-semibold text-gray-900">{karya.pencapaian}</p>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-sm text-gray-600">Tahun</p>
+                  <p className="font-semibold text-gray-900">{karya.tahun}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600">Pembuat</p>
+                  <p className="font-semibold text-gray-900">{karya.user?.name}</p>
+                  <p className="text-sm text-gray-600">{karya.user?.role}</p>
+                </div>
+
+                {karya.deskripsi && (
+                  <div>
+                    <p className="text-sm text-gray-600">Deskripsi</p>
+                    <p className="text-sm text-gray-700 line-clamp-3">{karya.deskripsi}</p>
+                  </div>
+                )}
+
+                {karya.status === 'rejected' && karya.alasan_reject && (
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <p className="text-sm font-semibold text-red-800 mb-1">Alasan Penolakan</p>
+                    <p className="text-sm text-red-700">{karya.alasan_reject}</p>
+                  </div>
                 )}
               </div>
+
+              <hr className="border-gray-200" />
+
+              {/* Metadata */}
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>ID: {karya.id}</p>
+                <p>Dibuat: {new Date(karya.created_at).toLocaleDateString('id-ID')}</p>
+                <p>Diupdate: {new Date(karya.updated_at).toLocaleDateString('id-ID')}</p>
+              </div>
             </div>
           </div>
 
-          {/* Description */}
-          {karya.deskripsi && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Deskripsi</h2>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{karya.deskripsi}</p>
-            </div>
-          )}
-
-          {/* Rejection Reason */}
-          {karya.status === 'rejected' && karya.alasan_reject && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="font-semibold text-red-800 mb-2">Alasan Penolakan</h3>
-              <p className="text-red-700">{karya.alasan_reject}</p>
-            </div>
-          )}
-
-          {/* Files Section */}
-          {(karya.file_path) && (
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">File Pendukung</h2>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <p className="font-medium text-gray-900">File Karya</p>
-                    <p className="text-sm text-gray-600">{karya.file_path.split('/').pop()}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    {/* View Button */}
-                    <button
-                      onClick={() => setShowFileViewer(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-                      title="Lihat file di web"
-                    >
-                      <Eye size={18} />
-                      Lihat
-                    </button>
-
-                    {/* Download Button */}
-                    <button
-                      onClick={() => {
-                        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-                        if (!token) {
-                          alert('Silakan login terlebih dahulu untuk mendownload file')
-                          return
-                        }
-                        window.location.href = `http://localhost:8000/api/karya/${karya.id}/download`
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                      title="Download file"
-                    >
-                      <Download size={18} />
-                      Download
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* File Viewer Modal */}
-          {showFileViewer && karya.file_path && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {karya.file_path.split('/').pop()}
-                  </h3>
+          {/* Right Side: File Preview */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* File Karya */}
+            {karya.file_path && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-blue-600 text-white px-4 py-3 font-semibold flex items-center justify-between">
+                  <span>📄 File Karya</span>
                   <button
-                    onClick={() => {
-                      setShowFileViewer(false)
-                      setFileError('')
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition"
+                    onClick={() => handleDownload('karya')}
+                    className="flex items-center gap-2 px-3 py-1 bg-blue-700 hover:bg-blue-800 rounded transition text-sm"
+                    title="Download File Karya"
                   >
-                    <X size={24} />
+                    <Download size={16} />
+                    Download
                   </button>
                 </div>
-
-                {/* File Content */}
-                <div className="flex-1 overflow-auto bg-gray-50 p-4">
-                  {fileError ? (
-                    <div className="flex flex-col items-center justify-center h-full">
-                      <AlertCircle className="text-red-500 mb-2" size={48} />
-                      <p className="text-red-600 text-center">{fileError}</p>
-                      <button
-                        onClick={() => {
-                          const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-                          if (token) {
-                            window.location.href = `http://localhost:8000/api/karya/${karya.id}/download`
-                          }
-                        }}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                      >
-                        Download File
-                      </button>
-                    </div>
-                  ) : (
-                    <FileViewer
-                      filePath={karya.file_path}
-                      fileName={karya.file_path.split('/').pop() || ''}
-                      onError={setFileError}
-                    />
-                  )}
+                <div className="h-96 overflow-auto bg-gray-50">
+                  <FilePreview filePath={karya.file_path} fileName={karya.file_path.split('/').pop() || ''} />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Metadata */}
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-            <p>ID: {karya.id}</p>
-            <p>Dibuat: {new Date(karya.created_at).toLocaleDateString('id-ID')}</p>
-            <p>Diupdate: {new Date(karya.updated_at).toLocaleDateString('id-ID')}</p>
+            {/* File Pendukung */}
+            {karya.file_pendukung_path && (
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="bg-green-600 text-white px-4 py-3 font-semibold flex items-center justify-between">
+                  <span>📎 File Pendukung</span>
+                  <button
+                    onClick={() => handleDownload('pendukung')}
+                    className="flex items-center gap-2 px-3 py-1 bg-green-700 hover:bg-green-800 rounded transition text-sm"
+                    title="Download File Pendukung"
+                  >
+                    <Download size={16} />
+                    Download
+                  </button>
+                </div>
+                <div className="h-96 overflow-auto bg-gray-50">
+                  <FilePreview filePath={karya.file_pendukung_path} fileName={karya.file_pendukung_path.split('/').pop() || ''} />
+                </div>
+              </div>
+            )}
+
+            {!karya.file_path && !karya.file_pendukung_path && (
+              <div className="bg-white rounded-lg shadow p-6 text-center">
+                <p className="text-gray-500">Tidak ada file yang diupload</p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Alert Modal */}
+        <ConfirmModal
+          isOpen={modal.isOpen}
+          type={modal.type}
+          title={modal.title}
+          message={modal.message}
+          confirmText="OK"
+          cancelText="Tutup"
+          onConfirm={() => setModal({ ...modal, isOpen: false })}
+          onCancel={() => setModal({ ...modal, isOpen: false })}
+        />
       </div>
     </div>
   )
 }
 
-interface FileViewerProps {
+interface FilePreviewProps {
   filePath: string
   fileName: string
-  onError: (error: string) => void
 }
 
-function FileViewer({ filePath, fileName, onError }: FileViewerProps) {
+function FilePreview({ filePath, fileName }: FilePreviewProps) {
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const getFileType = () => {
     const ext = fileName.toLowerCase().split('.').pop() || ''
     if (['pdf'].includes(ext)) return 'pdf'
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image'
     if (['txt', 'md', 'log'].includes(ext)) return 'text'
     return 'other'
   }
@@ -285,62 +298,94 @@ function FileViewer({ filePath, fileName, onError }: FileViewerProps) {
     setLoading(false)
   }, [])
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-6">
+        <div className="text-center">
+          <AlertCircle className="text-red-500 mx-auto mb-2" size={48} />
+          <p className="text-red-600 text-sm mb-2">{error}</p>
+          <a
+            href={fileUrl}
+            download
+            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+          >
+            Download file
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
-    return <div className="flex items-center justify-center h-full text-gray-500">Loading...</div>
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader size={24} className="animate-spin text-blue-600" />
+      </div>
+    )
   }
 
-  switch (fileType) {
-    case 'pdf':
-      return (
-        <iframe
-          src={`${fileUrl}#toolbar=0`}
-          className="w-full h-full"
-          onError={() => onError('Tidak bisa membuka file PDF di browser. Silakan download untuk membukanya.')}
+  if (fileType === 'pdf') {
+    return (
+      <iframe
+        src={`${fileUrl}#toolbar=0`}
+        className="w-full h-full"
+        onError={() => setError('Tidak bisa membuka PDF. Coba download.')}
+      />
+    )
+  }
+
+  if (fileType === 'image') {
+    return (
+      <div className="flex items-center justify-center h-full p-4">
+        <img
+          src={fileUrl}
+          alt={fileName}
+          className="max-w-full max-h-full object-contain"
+          onError={() => setError('Tidak bisa membuka gambar')}
         />
-      )
-
-    case 'image':
-      return (
-        <div className="flex items-center justify-center h-full">
-          <img
-            src={fileUrl}
-            alt={fileName}
-            className="max-w-full max-h-full object-contain"
-            onError={() => onError('Tidak bisa memuat gambar. File mungkin tidak ada atau format tidak didukung.')}
-          />
-        </div>
-      )
-
-    case 'text':
-      return (
-        <div className="w-full h-full">
-          <TextFileViewer fileUrl={fileUrl} onError={onError} />
-        </div>
-      )
-
-    default:
-      onError(`Format file tidak didukung untuk viewing (.${fileName.split('.').pop()}). Silakan download untuk membukanya.`)
-      return null
+      </div>
+    )
   }
+
+  if (fileType === 'text') {
+    return <TextPreview fileUrl={fileUrl} fileName={fileName} onError={setError} />
+  }
+
+  return (
+    <div className="flex items-center justify-center h-full p-6">
+      <p className="text-gray-500">Format file tidak bisa dipreview</p>
+    </div>
+  )
 }
 
-interface TextFileViewerProps {
+interface TextPreviewProps {
   fileUrl: string
-  onError: (error: string) => void
+  fileName: string
+  onError: (msg: string) => void
 }
 
-function TextFileViewer({ fileUrl, onError }: TextFileViewerProps) {
+function TextPreview({ fileUrl, fileName, onError }: TextPreviewProps) {
   const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch(fileUrl)
       .then((res) => res.text())
       .then(setContent)
-      .catch(() => onError('Tidak bisa membaca file teks'))
+      .catch(() => onError('Tidak bisa membaca file'))
+      .finally(() => setLoading(false))
   }, [fileUrl, onError])
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader size={24} className="animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
   return (
-    <pre className="bg-white p-4 rounded overflow-auto h-full text-xs text-gray-800 font-mono">
+    <pre className="p-4 text-xs text-gray-800 font-mono whitespace-pre-wrap break-words">
       {content}
     </pre>
   )
