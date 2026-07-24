@@ -1,23 +1,63 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useAuth } from '@/lib/auth-context'
+import { karyaAPI } from '@/lib/karya-api'
+
+interface StatItem {
+  icon: string
+  label: string
+  value: string
+}
+
+interface ChartDataItem {
+  name: string
+  value: number
+}
 
 export default function DashboardPage() {
-  const stats = [
-    { icon: '📄', label: 'Publikasi', value: '128' },
-    { icon: '🔬', label: 'Penelitian', value: '86' },
-    { icon: '🤝', label: 'Pengabdian', value: '42' },
-    { icon: '🏆', label: 'Prestasi', value: '35' },
-  ]
+  const { user } = useAuth()
+  const [stats, setStats] = useState<StatItem[]>([])
+  const [chartData, setChartData] = useState<ChartDataItem[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const chartData = [
-    { name: 'Publikasi', value: 128 },
-    { name: 'Penelitian', value: 86 },
-    { name: 'Pengabdian', value: 42 },
-    { name: 'Prestasi', value: 35 },
-    { name: 'HKI', value: 20 },
-    { name: 'Artikel', value: 68 },
-  ]
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  const loadStats = async () => {
+    try {
+      const response = await karyaAPI.getStats()
+
+      const iconMap: Record<string, string> = {
+        publikasi: '📄',
+        penelitian: '🔬',
+        pengabdian: '🤝',
+        prestasi: '🏆',
+        hki: '🔐',
+        artikel: '📰',
+      }
+
+      const statsArray: StatItem[] = []
+      Object.entries(response.stats).forEach(([key, value]) => {
+        statsArray.push({
+          icon: iconMap[key] || '📊',
+          label: key.charAt(0).toUpperCase() + key.slice(1),
+          value: value.toString(),
+        })
+      })
+
+      setStats(statsArray)
+      setChartData(response.chart_data)
+    } catch (error) {
+      console.error('Error loading stats:', error)
+      setStats([])
+      setChartData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -25,23 +65,29 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
           Dashboard
         </h1>
-        <p className="text-gray-600 mt-2">Selamat datang, Admin Prodi 👋</p>
+        <p className="text-gray-600 mt-2">Selamat datang, {user?.name} 👋</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                <p className="text-xs text-gray-500 mt-2">Total Data</p>
+        {loading ? (
+          <div className="col-span-full text-center py-12 text-gray-500">Loading...</div>
+        ) : stats.length > 0 ? (
+          stats.map((stat) => (
+            <div key={stat.label} className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 text-sm">{stat.label}</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
+                  <p className="text-xs text-gray-500 mt-2">Total Data</p>
+                </div>
+                <span className="text-4xl">{stat.icon}</span>
               </div>
-              <span className="text-4xl">{stat.icon}</span>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12 text-gray-500">Tidak ada data</div>
+        )}
       </div>
 
       {/* Charts */}
@@ -51,34 +97,40 @@ export default function DashboardPage() {
           <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Grafik Karya per Kategori
           </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#3B82F6" />
-            </BarChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <div className="h-[300px] flex items-center justify-center text-gray-500">Loading...</div>
+          ) : chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="#3B82F6" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-gray-500">Tidak ada data</div>
+          )}
         </div>
 
-        {/* Recent Activity */}
+        {/* Placeholder Activity */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            Karya Terbaru
+            Info Sistem
           </h2>
           <div className="space-y-3">
-            <div className="p-3 bg-gray-50 rounded border-l-4 border-l-blue-600">
-              <p className="font-medium text-gray-900 text-sm">Optimalisasi Rangka Sepeda</p>
-              <p className="text-xs text-gray-600 mt-1">Dr. Bambang • Penelitian</p>
+            <div className="p-3 bg-blue-50 rounded border-l-4 border-l-blue-600">
+              <p className="font-medium text-gray-900 text-sm">Sistem SIM-KARA</p>
+              <p className="text-xs text-gray-600 mt-1">Manajemen Karya Akademik</p>
             </div>
-            <div className="p-3 bg-gray-50 rounded border-l-4 border-l-green-600">
-              <p className="font-medium text-gray-900 text-sm">Analisa Performa Motor Biodisel</p>
-              <p className="text-xs text-gray-600 mt-1">Ir. Siti • Publikasi</p>
+            <div className="p-3 bg-green-50 rounded border-l-4 border-l-green-600">
+              <p className="font-medium text-gray-900 text-sm">Role Anda: {user?.role}</p>
+              <p className="text-xs text-gray-600 mt-1">Akses sesuai permission</p>
             </div>
-            <div className="p-3 bg-gray-50 rounded border-l-4 border-l-amber-600">
-              <p className="font-medium text-gray-900 text-sm">Pelatihan Pereparasian Mesin</p>
-              <p className="text-xs text-gray-600 mt-1">Tim • Pengabdian</p>
+            <div className="p-3 bg-amber-50 rounded border-l-4 border-l-amber-600">
+              <p className="font-medium text-gray-900 text-sm">Total Stats</p>
+              <p className="text-xs text-gray-600 mt-1">Lihat grafik di atas</p>
             </div>
           </div>
         </div>

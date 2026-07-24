@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { getKarya, Karya } from '@/lib/karya'
-import KaryaCard from '@/components/KaryaCard'
+import { karyaAPI, type Karya } from '@/lib/karya-api'
+import { Eye } from 'lucide-react'
 
 export default function KaryaPage() {
   const [karya, setKarya] = useState<Karya[]>([])
@@ -14,41 +14,34 @@ export default function KaryaPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const itemsPerPage = 12
-  const categories = ['semua', 'Publikasi', 'Penelitian', 'Pengabdian', 'Buku', 'HKI', 'Prestasi', 'Artikel']
+  const categories = ['semua', 'Publikasi', 'Penelitian', 'Pengabdian', 'HKI', 'Prestasi', 'Artikel']
 
-  // Fetch karya
+  // Fetch karya - hanya verified
   useEffect(() => {
     const fetchKarya = async () => {
       setLoading(true)
       try {
-        const data = await getKarya()
-        setKarya(data.data || mockData)
-      } catch (err) {
+        const data = await karyaAPI.getAll({
+          search: searchTerm || undefined,
+          jenis: selectedCategory !== 'semua' ? selectedCategory : undefined,
+          status: 'verified', // Hanya tampilkan karya verified
+        })
+        setKarya(data.data || [])
+        setError(null)
+      } catch (err: any) {
         console.error('Error:', err)
         setError('Gagal memuat data karya')
-        setKarya(mockData)
+        setKarya([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchKarya()
-  }, [])
+  }, [searchTerm, selectedCategory])
 
-  // Filter & Search
+  // Filter (done di backend)
   let filtered = karya
-
-  if (selectedCategory !== 'semua') {
-    filtered = filtered.filter((k) => k.kategori === selectedCategory)
-  }
-
-  if (searchTerm) {
-    filtered = filtered.filter(
-      (k) =>
-        k.judul.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        k.penulis.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }
 
   // Pagination
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -121,7 +114,39 @@ export default function KaryaPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
               {paginatedKarya.map((k) => (
-                <KaryaCard key={k.id} karya={k} />
+                <Link key={k.id} href={`/karya/${k.id}`}>
+                  <div className="bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer h-full border-l-4 border-l-blue-600">
+                    {/* Title */}
+                    <div className="mb-4">
+                      <h4 className="font-semibold text-blue-600 text-sm mb-2">{k.jenis}</h4>
+                      <h5 className="font-semibold text-gray-900 text-base line-clamp-2 mb-2">
+                        {k.judul}
+                      </h5>
+                      <p className="text-sm text-gray-600 line-clamp-2">{k.deskripsi}</p>
+                    </div>
+
+                    {/* Author & Meta */}
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-medium text-gray-900">{k.user?.name}</p>
+                      <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
+                        <span>{k.level}</span>
+                        <span>{k.tahun}</span>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div className="mt-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        k.status === 'verified' ? 'bg-green-100 text-green-800' :
+                        k.status === 'submitted' ? 'bg-yellow-100 text-yellow-800' :
+                        k.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {k.status === 'verified' ? '✓ Verified' : k.status}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
 
@@ -170,55 +195,3 @@ export default function KaryaPage() {
     </div>
   )
 }
-
-// Mock data (untuk development sebelum API siap)
-const mockData: Karya[] = [
-  {
-    id: 1,
-    judul: 'Optimalisasi Desain Rangka Sepeda Listrik',
-    kategori: 'Penelitian',
-    penulis: 'Dr. Bambang Suryanto',
-    tahun: 2024,
-    deskripsi: 'Penelitian tentang optimalisasi desain rangka sepeda listrik menggunakan CFD',
-  },
-  {
-    id: 2,
-    judul: 'Analisa Performa Motor Biodisel',
-    kategori: 'Publikasi',
-    penulis: 'Ir. Siti Nurhasanah',
-    tahun: 2024,
-    deskripsi: 'Publikasi di jurnal internasional tentang performa motor biodisel',
-  },
-  {
-    id: 3,
-    judul: 'Pelatihan Pereparasian Mesin untuk Masyarakat',
-    kategori: 'Pengabdian',
-    penulis: 'Tim Pengabdian',
-    tahun: 2024,
-    deskripsi: 'Program pelatihan gratis untuk masyarakat desa',
-  },
-  {
-    id: 4,
-    judul: 'Buku Ajar Elemen Mesin',
-    kategori: 'Buku',
-    penulis: 'Prof. Budi Santoso',
-    tahun: 2023,
-    deskripsi: 'Buku ajar komprehensif tentang elemen mesin',
-  },
-  {
-    id: 5,
-    judul: 'Patent: Sistem Pendingin Motor Efisien',
-    kategori: 'HKI',
-    penulis: 'Dr. Adi Firmansyah',
-    tahun: 2023,
-    deskripsi: 'Paten sistem pendingin motor yang lebih efisien',
-  },
-  {
-    id: 6,
-    judul: 'Juara Kompetisi Robot ASEAN 2024',
-    kategori: 'Prestasi',
-    penulis: 'Tim Robotik',
-    tahun: 2024,
-    deskripsi: 'Mahasiswa meraih juara 1 di kompetisi robot ASEAN',
-  },
-]

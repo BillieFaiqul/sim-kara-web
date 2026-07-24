@@ -1,36 +1,69 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TrendingUp } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { karyaAPI, type Karya, type StatsResponse } from '@/lib/karya-api'
+
+interface RecentKarya {
+  id: number
+  judul: string
+  jenis: string
+  user?: { name: string; role: string }
+  tahun: number
+  icon: string
+}
 
 export default function Home() {
-  // Mock data for recent karya
-  const recentKarya = [
-    {
-      id: 1,
-      judul: 'Optimalisasi Desain Rangka Sepeda Listrik',
-      kategori: 'Penelitian',
-      penulis: 'Dr. Bambang Suryanto',
-      tahun: 2024,
-      icon: '🔬',
-    },
-    {
-      id: 2,
-      judul: 'Analisa Performa Motor Biodisel',
-      kategori: 'Publikasi',
-      penulis: 'Ir. Siti Nurhasanah',
-      tahun: 2024,
-      icon: '📝',
-    },
-    {
-      id: 3,
-      judul: 'Pelatihan Pereparasian Mesin untuk Masyarakat',
-      kategori: 'Pengabdian',
-      penulis: 'Tim Pengabdian',
-      tahun: 2024,
-      icon: '🤝',
-    },
-  ]
+  const [recentKarya, setRecentKarya] = useState<RecentKarya[]>([])
+  const [stats, setStats] = useState<Record<string, number>>({})
+  const [chartData, setChartData] = useState<Array<{name: string; value: number}>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      // Get stats
+      const statsData = await karyaAPI.getStats()
+      setStats(statsData.stats)
+      setChartData(statsData.chart_data)
+
+      // Get recent karya
+      const karyaData = await karyaAPI.getAll()
+      const transformed = karyaData.data.slice(0, 3).map((k: Karya) => ({
+        id: k.id,
+        judul: k.judul,
+        jenis: k.jenis,
+        user: k.user,
+        tahun: k.tahun,
+        icon: getIconForJenis(k.jenis),
+      }))
+      setRecentKarya(transformed)
+    } catch (error) {
+      console.error('Error loading data:', error)
+      setStats({})
+      setChartData([])
+      setRecentKarya([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getIconForJenis = (jenis: string): string => {
+    const iconMap: Record<string, string> = {
+      'Publikasi': '📝',
+      'Penelitian': '🔬',
+      'Pengabdian': '🤝',
+      'Prestasi': '🏆',
+      'HKI': '🔐',
+      'Artikel': '📰',
+    }
+    return iconMap[jenis] || '📊'
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
@@ -73,56 +106,39 @@ export default function Home() {
           <h3 className="text-3xl font-bold text-center mb-12 text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
             Statistik Karya
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <p className="text-4xl font-bold text-blue-600 mb-2">128</p>
-              <p className="text-gray-600 font-medium">Publikasi</p>
-            </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <p className="text-4xl font-bold text-green-600 mb-2">86</p>
-              <p className="text-gray-600 font-medium">Penelitian</p>
-            </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <p className="text-4xl font-bold text-amber-600 mb-2">42</p>
-              <p className="text-gray-600 font-medium">Pengabdian</p>
-            </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <p className="text-4xl font-bold text-red-600 mb-2">35</p>
-              <p className="text-gray-600 font-medium">Prestasi</p>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
+            {loading ? (
+              <div className="col-span-full text-center py-8 text-gray-500">Loading...</div>
+            ) : (
+              Object.entries(stats).map(([key, value]) => (
+                <div key={key} className="text-center p-6 bg-gray-50 rounded-lg">
+                  <p className="text-4xl font-bold text-blue-600 mb-2">{value}</p>
+                  <p className="text-gray-600 font-medium text-sm capitalize">{key}</p>
+                </div>
+              ))
+            )}
           </div>
 
-          {/* Chart - Smaller */}
-          <div className="bg-gray-50 p-8 rounded-lg max-w-3xl mx-auto">
+          {/* Chart - Real-time */}
+          <div className="bg-gray-50 p-8 rounded-lg max-w-4xl mx-auto">
             <h4 className="text-xl font-bold mb-6 text-center text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
               Distribusi Karya per Kategori
             </h4>
-            <svg viewBox="0 0 400 250" className="w-full h-auto">
-              {/* Axes */}
-              <line x1="50" y1="200" x2="380" y2="200" stroke="#d1d5db" strokeWidth="2" />
-              <line x1="50" y1="20" x2="50" y2="200" stroke="#d1d5db" strokeWidth="2" />
-
-              {/* Bars */}
-              <rect x="70" y="100" width="35" height="100" fill="#3B82F6" />
-              <text x="87.5" y="220" textAnchor="middle" fontSize="11" fill="#4b5563">Publikasi</text>
-              <text x="87.5" y="90" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1f2937">128</text>
-
-              <rect x="125" y="128" width="35" height="72" fill="#10B981" />
-              <text x="142.5" y="220" textAnchor="middle" fontSize="11" fill="#4b5563">Penelitian</text>
-              <text x="142.5" y="118" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1f2937">86</text>
-
-              <rect x="180" y="165" width="35" height="35" fill="#F59E0B" />
-              <text x="197.5" y="220" textAnchor="middle" fontSize="11" fill="#4b5563">Pengabdian</text>
-              <text x="197.5" y="155" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1f2937">42</text>
-
-              <rect x="235" y="172" width="35" height="28" fill="#EF4444" />
-              <text x="252.5" y="220" textAnchor="middle" fontSize="11" fill="#4b5563">Prestasi</text>
-              <text x="252.5" y="162" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1f2937">35</text>
-
-              <rect x="290" y="186" width="35" height="14" fill="#8B5CF6" />
-              <text x="307.5" y="220" textAnchor="middle" fontSize="11" fill="#4b5563">HKI</text>
-              <text x="307.5" y="176" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#1f2937">20</text>
-            </svg>
+            {loading ? (
+              <div className="h-80 flex items-center justify-center text-gray-500">Loading chart...</div>
+            ) : chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-80 flex items-center justify-center text-gray-500">Tidak ada data</div>
+            )}
           </div>
         </div>
       </section>
@@ -138,30 +154,36 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recentKarya.map((karya) => (
-              <Link key={karya.id} href={`/karya/${karya.id}`}>
-                <div className="bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer h-full hover:border-b-4 hover:border-b-blue-600">
-                  {/* Icon & Title */}
-                  <div className="flex gap-3 mb-4">
-                    <span className="text-3xl">{karya.icon}</span>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-blue-600 text-sm mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                        {karya.kategori}
-                      </h4>
-                      <h5 className="font-semibold text-gray-900 text-sm line-clamp-2">
-                        {karya.judul}
-                      </h5>
+            {loading ? (
+              <div className="col-span-full text-center py-12 text-gray-500">Loading karya...</div>
+            ) : recentKarya.length > 0 ? (
+              recentKarya.map((karya) => (
+                <Link key={karya.id} href={`/karya/${karya.id}`}>
+                  <div className="bg-white rounded-lg shadow hover:shadow-lg transition p-6 cursor-pointer h-full hover:border-b-4 hover:border-b-blue-600">
+                    {/* Icon & Title */}
+                    <div className="flex gap-3 mb-4">
+                      <span className="text-3xl">{karya.icon}</span>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-blue-600 text-sm mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                          {karya.jenis}
+                        </h4>
+                        <h5 className="font-semibold text-gray-900 text-sm line-clamp-2">
+                          {karya.judul}
+                        </h5>
+                      </div>
+                    </div>
+
+                    {/* Author & Year */}
+                    <div className="border-t pt-4">
+                      <p className="text-sm text-gray-600 mb-1">{karya.user?.name}</p>
+                      <p className="text-sm font-medium text-gray-500">{karya.tahun}</p>
                     </div>
                   </div>
-
-                  {/* Author & Year */}
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-1">{karya.penulis}</p>
-                    <p className="text-sm font-medium text-gray-500">{karya.tahun}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12 text-gray-500">Tidak ada karya</div>
+            )}
           </div>
 
           {/* View All Button */}
