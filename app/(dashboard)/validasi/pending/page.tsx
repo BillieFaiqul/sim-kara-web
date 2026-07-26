@@ -1,108 +1,142 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Eye, CheckCircle, XCircle, Search, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-
-interface Karya {
-  id: number
-  judul: string
-  pembuat: string
-  role: 'Dosen' | 'Mahasiswa'
-  nip_nim: string
-  jenis: string
-  tahun: number
-  level: string
-  status: 'submitted'
-  tanggal_submit: string
-}
+import { karyaAPI, type Karya } from '@/lib/karya-api'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 export default function ValidasiPendingPage() {
-  const [karyaList, setKaryaList] = useState<Karya[]>([
-    {
-      id: 2,
-      judul: 'Analisa Performa Motor Biodisel',
-      pembuat: 'Ir. Siti Nurhasanah',
-      role: 'Dosen',
-      nip_nim: '0987654321',
-      jenis: 'Penelitian',
-      tahun: 2024,
-      level: 'Nasional',
-      status: 'submitted',
-      tanggal_submit: '2024-07-21',
-    },
-    {
-      id: 5,
-      judul: 'Platform E-Learning Interaktif',
-      pembuat: 'Budi Santoso',
-      role: 'Mahasiswa',
-      nip_nim: '210411100003',
-      jenis: 'Publikasi',
-      tahun: 2024,
-      level: 'Nasional',
-      status: 'submitted',
-      tanggal_submit: '2024-07-22',
-    },
-    {
-      id: 6,
-      judul: 'Sistem Otomasi Greenhouse',
-      pembuat: 'Dr. Hendra Wijaya',
-      role: 'Dosen',
-      nip_nim: '1122334455',
-      jenis: 'Pengabdian',
-      tahun: 2024,
-      level: 'Lokal',
-      status: 'submitted',
-      tanggal_submit: '2024-07-23',
-    },
-  ])
+  const [karyaList, setKaryaList] = useState<Karya[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+  const [search, setSearch] = useState('')
 
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [selectedKarya, setSelectedKarya] = useState<Karya | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [showApproveConfirm, setShowApproveConfirm] = useState(false)
-  const [approveKaryaId, setApproveKaryaId] = useState<number | null>(null)
+  const [modal, setModal] = useState<{
+    isOpen: boolean
+    type: 'confirm' | 'success' | 'error'
+    title: string
+    message: string
+    action?: () => void
+    destructive?: boolean
+  }>({
+    isOpen: false,
+    type: 'confirm',
+    title: '',
+    message: '',
+    destructive: false,
+  })
 
-  const handleApproveClick = (karya: Karya) => {
-    setApproveKaryaId(karya.id)
-    setShowApproveConfirm(true)
-  }
+  const [rejectModal, setRejectModal] = useState({
+    isOpen: false,
+    karyaId: null as number | null,
+    reason: '',
+  })
 
-  const handleApproveConfirm = () => {
-    if (approveKaryaId) {
-      setKaryaList(karyaList.filter(k => k.id !== approveKaryaId))
-      setShowApproveConfirm(false)
-      setApproveKaryaId(null)
-      alert('Karya disetujui! Status berubah menjadi VERIFIED')
+  useEffect(() => {
+    loadKarya()
+  }, [search])
+
+  const loadKarya = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await karyaAPI.getAll({
+        status: 'submitted',
+        search: search || undefined,
+      })
+      setKaryaList(response.data)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Gagal memuat data karya')
+      console.error('Error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleRejectClick = (karya: Karya) => {
-    setSelectedKarya(karya)
-    setRejectReason('')
-    setShowRejectModal(true)
+  const confirmApprove = (karya: Karya) => {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Setujui Karya?',
+      message: `Apakah Anda yakin ingin menyetujui karya "${karya.judul}"? Karya akan ditampilkan di Etalase Publik.`,
+      action: () => handleApprove(karya.id),
+    })
   }
 
-  const handleRejectSubmit = () => {
-    if (!selectedKarya || !rejectReason.trim()) {
-      alert('Silakan isi alasan penolakan')
+  const handleApprove = async (karyaId: number) => {
+    try {
+      setActionLoading(true)
+      await karyaAPI.approve(karyaId)
+      setKaryaList(karyaList.filter(k => k.id !== karyaId))
+      setModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Berhasil',
+        message: 'Karya berhasil disetujui dan ditampilkan di Etalase Publik',
+        destructive: false,
+      })
+    } catch (err: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: err?.response?.data?.message || 'Gagal menyetujui karya',
+        destructive: false,
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openRejectModal = (karyaId: number) => {
+    setRejectModal({
+      isOpen: true,
+      karyaId,
+      reason: '',
+    })
+  }
+
+  const handleReject = async () => {
+    if (!rejectModal.karyaId || !rejectModal.reason.trim()) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Silakan isi alasan penolakan',
+        destructive: false,
+      })
       return
     }
 
-    setKaryaList(karyaList.filter(k => k.id !== selectedKarya.id))
-    setShowRejectModal(false)
-    setSelectedKarya(null)
-    setRejectReason('')
-    alert(`Karya ditolak dengan alasan: "${rejectReason}"`)
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+    try {
+      setActionLoading(true)
+      await karyaAPI.reject(rejectModal.karyaId, rejectModal.reason)
+      setKaryaList(karyaList.filter(k => k.id !== rejectModal.karyaId))
+      setRejectModal({
+        isOpen: false,
+        karyaId: null,
+        reason: '',
+      })
+      setModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Berhasil',
+        message: 'Karya berhasil ditolak',
+        destructive: false,
+      })
+    } catch (err: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: err?.response?.data?.message || 'Gagal menolak karya',
+        destructive: false,
+      })
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   return (
@@ -112,227 +146,199 @@ export default function ValidasiPendingPage() {
         <h1 className="text-3xl font-bold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
           Pending Validasi
         </h1>
-        <p className="text-gray-600 mt-2">Tinjau dan setujui karya yang menunggu validasi</p>
+        <p className="text-gray-600 mt-2">Tinjau dan validasi karya yang menunggu persetujuan</p>
       </div>
 
-      {/* Info Card */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-yellow-900">
-            Ada <span className="font-bold">{karyaList.length}</span> karya menunggu validasi Anda
-          </p>
-          <p className="text-xs text-yellow-700 mt-1">
-            Anda dapat menyetujui atau menolak dengan memberikan alasan jika ditolak
-          </p>
-        </div>
-      </div>
-
-      {/* Karya List */}
-      {karyaList.length > 0 ? (
-        <div className="space-y-4">
-          {karyaList.map((karya, index) => (
-            <div key={karya.id} className="bg-white rounded-lg shadow p-6 border-l-4 border-l-yellow-500 hover:shadow-lg transition">
-              {/* Number Badge */}
-              <div className="absolute top-4 right-4">
-                <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
-                  #{index + 1}
-                </span>
-              </div>
-
-              {/* Content Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                {/* Column 1: Judul & Pembuat */}
-                <div>
-                  <h3 className="font-bold text-lg text-gray-900 mb-3 line-clamp-2">
-                    {karya.judul}
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <p className="text-gray-600">Pembuat</p>
-                      <p className="font-medium text-gray-900">{karya.pembuat}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">NIP/NIM</p>
-                      <p className="font-medium text-gray-900">{karya.nip_nim}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Detail Karya */}
-                <div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-gray-600 text-sm">Role</p>
-                      <p className="font-medium text-gray-900">{karya.role}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 text-sm">Jenis</p>
-                      <p className="font-medium text-gray-900">{karya.jenis}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 text-sm">Tahun</p>
-                      <p className="font-medium text-gray-900">{karya.tahun}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 3: Level & Tanggal */}
-                <div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-gray-600 text-sm">Level Publikasi</p>
-                      <div className="flex gap-2 mt-1">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                          karya.level === 'Internasional' ? 'bg-blue-100 text-blue-800' :
-                          karya.level === 'Nasional' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {karya.level}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 text-sm">Tanggal Submit</p>
-                      <p className="font-medium text-gray-900">{formatDate(karya.tanggal_submit)}</p>
-                    </div>
-                    <div>
-                      <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-xs font-semibold">
-                        Pending
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="border-t border-gray-200 pt-4">
-                <div className="flex flex-wrap gap-2">
-                  {/* View Detail Button */}
-                  <Link href={`/dashboard/validasi/${karya.id}`}>
-                    <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">
-                      <Eye size={16} />
-                      Lihat Detail
-                    </button>
-                  </Link>
-
-                  {/* Approve Button */}
-                  <button
-                    onClick={() => handleApproveClick(karya)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium text-sm"
-                  >
-                    <CheckCircle size={16} />
-                    Setujui
-                  </button>
-
-                  {/* Reject Button */}
-                  <button
-                    onClick={() => handleRejectClick(karya)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm"
-                  >
-                    <XCircle size={16} />
-                    Tolak
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Empty State */
-        <div className="bg-white rounded-lg shadow p-12 text-center">
-          <CheckCircle size={48} className="mx-auto text-green-600 mb-4" />
-          <p className="text-lg font-medium text-gray-900">Semua Karya Tervalidasi!</p>
-          <p className="text-gray-600 mt-2">Tidak ada karya yang menunggu validasi Anda saat ini.</p>
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex gap-2">
+          <AlertCircle size={20} className="flex-shrink-0" />
+          <p>{error}</p>
         </div>
       )}
 
-      {/* APPROVE CONFIRMATION MODAL */}
-      {showApproveConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle size={24} className="text-green-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">Setujui Karya?</h2>
-            </div>
-
-            <p className="text-gray-600 mb-6">
-              Apakah Anda yakin ingin menyetujui karya ini? Karya akan ditampilkan di Etalase Publik.
+      {/* Info Card */}
+      {karyaList.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-yellow-900">
+              Ada <span className="font-bold">{karyaList.length}</span> karya menunggu validasi Anda
             </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowApproveConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleApproveConfirm}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
-              >
-                Ya, Setujui
-              </button>
-            </div>
+            <p className="text-xs text-yellow-700 mt-1">
+              Silakan periksa detail dan berikan keputusan setuju atau tolak
+            </p>
           </div>
         </div>
       )}
 
-      {/* REJECT MODAL */}
-      {showRejectModal && selectedKarya && (
+      {/* Search */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+          <input
+            type="text"
+            placeholder="Cari judul atau pembuat..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            disabled={loading}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:bg-gray-100"
+          />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        ) : karyaList.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Judul</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Pembuat</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Jenis</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Level</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tahun</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {karyaList.map(karya => (
+                  <tr key={karya.id} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-gray-900 line-clamp-2">{karya.judul}</p>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{karya.nama || karya.user?.name}</p>
+                        <p className="text-xs text-gray-500">{karya.nip_nim || karya.user?.role}</p>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-700">{karya.jenis}</span>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-700">{karya.level}</span>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-700">{karya.tahun}</span>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end gap-2">
+                        {/* View Detail */}
+                        <Link href={`/semua-karya/${karya.id}`}>
+                          <button
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="Lihat Detail"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </Link>
+
+                        {/* Approve */}
+                        <button
+                          onClick={() => confirmApprove(karya)}
+                          disabled={actionLoading}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition disabled:opacity-50"
+                          title="Setujui"
+                        >
+                          <CheckCircle size={18} />
+                        </button>
+
+                        {/* Reject */}
+                        <button
+                          onClick={() => openRejectModal(karya.id)}
+                          disabled={actionLoading}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                          title="Tolak"
+                        >
+                          <XCircle size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <CheckCircle size={48} className="mx-auto text-green-600 mb-4" />
+            <p className="text-lg font-medium text-gray-900">Semua Karya Tervalidasi!</p>
+            <p className="text-gray-600 mt-2">Tidak ada karya yang menunggu validasi Anda saat ini.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={modal.isOpen}
+        type={modal.type as any}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Ya, Setujui' : 'OK'}
+        cancelText={modal.type === 'error' || modal.type === 'success' ? 'Tutup' : 'Batal'}
+        destructive={modal.destructive}
+        loading={actionLoading}
+        onConfirm={() => {
+          if (modal.action) {
+            modal.action()
+          } else {
+            setModal({ ...modal, isOpen: false })
+          }
+        }}
+        onCancel={() => setModal({ ...modal, isOpen: false })}
+      />
+
+      {/* Reject Modal */}
+      {rejectModal.isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <XCircle size={24} className="text-red-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900">Tolak Karya</h2>
-            </div>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Tolak Karya</h2>
 
-            {/* Karya Info */}
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Karya yang ditolak:</p>
-              <p className="text-sm font-medium text-gray-900 line-clamp-2">
-                {selectedKarya.judul}
-              </p>
-              <p className="text-xs text-gray-600 mt-2">
-                Pembuat: {selectedKarya.pembuat}
+              <p className="text-sm font-medium text-gray-900">
+                {karyaList.find(k => k.id === rejectModal.karyaId)?.judul}
               </p>
             </div>
 
-            {/* Reason Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Alasan Penolakan <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Jelaskan alasan penolakan karya ini (mis: Dokumen tidak lengkap, format tidak sesuai, duplikasi, dll)"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent resize-none"
+                value={rejectModal.reason}
+                onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
+                placeholder="Jelaskan alasan penolakan karya ini..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 text-black resize-none"
                 rows={4}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Pembuat karya akan melihat alasan ini saat mencek detail karya mereka
-              </p>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
-                onClick={() => setShowRejectModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                onClick={() => setRejectModal({ ...rejectModal, isOpen: false })}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 font-medium"
               >
                 Batal
               </button>
               <button
-                onClick={handleRejectSubmit}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!rejectReason.trim()}
+                onClick={handleReject}
+                disabled={!rejectModal.reason.trim() || actionLoading}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 font-medium"
               >
-                Tolak Karya
+                {actionLoading ? 'Loading...' : 'Tolak Karya'}
               </button>
             </div>
           </div>

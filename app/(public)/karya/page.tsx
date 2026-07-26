@@ -128,7 +128,10 @@ export default function KaryaPage() {
                     {/* Author & Meta */}
                     <div className="border-t pt-4">
                       <p className="text-sm font-medium text-gray-900">
-                        {k.user?.name} {k.user?.role ? `- ${k.user.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}` : ''}
+                        {k.nama || k.user?.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {k.nip_nim || k.user?.role}
                       </p>
                       <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                         <span>{k.level}</span>

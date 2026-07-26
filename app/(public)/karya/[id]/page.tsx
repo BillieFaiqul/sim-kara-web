@@ -178,10 +178,19 @@ export default function PublicKaryaDetailPage() {
                   <p className="font-semibold text-gray-900">{karya.tahun}</p>
                 </div>
 
-                <div>
-                  <p className="text-sm text-gray-600">Pembuat</p>
-                  <p className="font-semibold text-gray-900">{karya.user?.name}</p>
-                </div>
+                {(karya.nama || karya.user?.name) && (
+                  <div>
+                    <p className="text-sm text-gray-600">Pembuat</p>
+                    <p className="font-semibold text-gray-900">{karya.nama || karya.user?.name}</p>
+                  </div>
+                )}
+
+                {(karya.nip_nim || karya.user?.role) && (
+                  <div>
+                    <p className="text-sm text-gray-600">NIP/NIM</p>
+                    <p className="font-semibold text-gray-900">{karya.nip_nim || karya.user?.role}</p>
+                  </div>
+                )}
 
                 {karya.deskripsi && (
                   <div>

@@ -36,30 +36,36 @@ const pencapaianConfig: LevelConfig = {
     { value: 'Sinta 5', label: 'Sinta 5' },
     { value: 'Sinta 6', label: 'Sinta 6' },
     { value: 'Prosiding', label: 'Prosiding' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
   'Prestasi': [
     { value: 'Juara 1', label: 'Juara 1' },
     { value: 'Juara 2', label: 'Juara 2' },
     { value: 'Juara 3', label: 'Juara 3' },
     { value: 'Peserta', label: 'Peserta' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
   'Penelitian': [
-    { value: 'Peneliti Utama', label: 'Peneliti Utama' },
-    { value: 'Peneliti Anggota', label: 'Peneliti Anggota' },
+    { value: 'Ketua Penelitian', label: 'Ketua Penelitian' },
+    { value: 'Anggota Penelitian', label: 'Anggota Penelitian' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
   'Pengabdian': [
-    { value: 'Nasional', label: 'Nasional' },
-    { value: 'Lokal', label: 'Lokal' },
+    { value: 'Ketua', label: 'Ketua' },
+    { value: 'Anggota', label: 'Anggota' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
   'HKI': [
     { value: 'Paten', label: 'Paten' },
     { value: 'Hak Cipta', label: 'Hak Cipta' },
     { value: 'Merek', label: 'Merek' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
   'Artikel': [
     { value: 'Feature', label: 'Feature' },
     { value: 'Opinion', label: 'Opinion' },
     { value: 'News', label: 'News' },
+    { value: '__custom__', label: 'Lainnya' },
   ],
 }
 
@@ -93,6 +99,8 @@ export default function TambahKaryaPage() {
   const [uploadedFilePath, setUploadedFilePath] = useState('')
   const [uploadedPendukungPath, setUploadedPendukungPath] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [customPencapaian, setCustomPencapaian] = useState('')
+  const [isCustomMode, setIsCustomMode] = useState(false)
 
   const [modal, setModal] = useState<{
     isOpen: boolean
@@ -118,12 +126,49 @@ export default function TambahKaryaPage() {
         [name]: value,
         pencapaian: '',
       }))
+      setCustomPencapaian('')
+      setIsCustomMode(false)
+    } else if (name === 'pencapaian') {
+      if (value === '__custom__') {
+        // Jika pilih Lainnya
+        setIsCustomMode(true)
+        setCustomPencapaian('')
+        setFormData(prev => ({
+          ...prev,
+          pencapaian: '',
+        }))
+      } else if (value === '') {
+        // Reset
+        setIsCustomMode(false)
+        setCustomPencapaian('')
+        setFormData(prev => ({
+          ...prev,
+          pencapaian: '',
+        }))
+      } else {
+        // Jika pilih opsi standar
+        setIsCustomMode(false)
+        setCustomPencapaian('')
+        setFormData(prev => ({
+          ...prev,
+          pencapaian: value,
+        }))
+      }
     } else {
       setFormData(prev => ({
         ...prev,
         [name]: name === 'tahun' ? parseInt(value) : value,
       }))
     }
+  }
+
+  const handleCustomPencapaianChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setCustomPencapaian(value)
+    setFormData(prev => ({
+      ...prev,
+      pencapaian: value,
+    }))
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,6 +276,8 @@ export default function TambahKaryaPage() {
 
       const submitData = {
         judul: formData.judul,
+        nama: formData.nama,
+        nip_nim: formData.nip_nim,
         jenis: formData.jenis,
         level: formData.level,
         pencapaian: formData.pencapaian,
@@ -439,17 +486,31 @@ export default function TambahKaryaPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-black mb-2">Pencapaian *</label>
-                  <select
-                    name="pencapaian"
-                    value={formData.pencapaian}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-black bg-white"
-                  >
-                    <option value="" className="text-black bg-white">Pilih pencapaian...</option>
-                    {getPencapaianOptions().map(opt => (
-                      <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <select
+                      name="pencapaian"
+                      value={isCustomMode ? '__custom__' : formData.pencapaian}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900 bg-white font-medium"
+                    >
+                      <option value="" className="text-black bg-white">Pilih pencapaian...</option>
+                      {getPencapaianOptions().map(opt => (
+                        <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>
+                      ))}
+                    </select>
+
+                    {/* Input custom jika pilih Lainnya */}
+                    {isCustomMode && (
+                      <input
+                        type="text"
+                        value={customPencapaian}
+                        onChange={handleCustomPencapaianChange}
+                        placeholder="Masukkan pencapaian lainnya..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-black"
+                        autoFocus
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 

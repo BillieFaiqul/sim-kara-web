@@ -21,14 +21,25 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<StatItem[]>([])
   const [chartData, setChartData] = useState<ChartDataItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+
+  useEffect(() => {
+    // Generate tahun dari 50 tahun yang lalu sampai sekarang
+    const currentYear = new Date().getFullYear()
+    const startYear = currentYear - 50
+    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
+    setAvailableYears(years.reverse())
+  }, [])
 
   useEffect(() => {
     loadStats()
-  }, [])
+  }, [selectedYear])
 
   const loadStats = async () => {
     try {
-      const response = await karyaAPI.getStats()
+      setLoading(true)
+      const response = await karyaAPI.getStats(selectedYear)
 
       const iconMap: Record<string, string> = {
         publikasi: '📄',
@@ -94,9 +105,22 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Bar Chart */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            Grafik Karya per Kategori
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
+              Distribusi Karya per Kategori
+            </h2>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900 bg-white"
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
           {loading ? (
             <div className="h-[300px] flex items-center justify-center text-gray-500">Loading...</div>
           ) : chartData.length > 0 ? (

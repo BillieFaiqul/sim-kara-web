@@ -72,6 +72,17 @@ class AuthAPI {
       async (error) => {
         const originalRequest = error.config
         const currentToken = this.getToken()
+        const errorCode = error.response?.data?.code
+
+        // Jika token expired, langsung redirect ke login
+        if (errorCode === 'TOKEN_EXPIRED' || (error.response?.status === 401 && !currentToken)) {
+          this.clearToken()
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('auth_message', 'Sesi Anda telah berakhir. Silakan login kembali.')
+            window.location.href = '/login'
+          }
+          return Promise.reject(error)
+        }
 
         // Hanya retry refresh jika:
         // 1. Status 401
@@ -90,10 +101,15 @@ class AuthAPI {
             this.saveToken(newToken)
             originalRequest.headers.Authorization = `Bearer ${newToken}`
             return this.api(originalRequest)
-          } catch (refreshError) {
-            this.clearToken()
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login'
+          } catch (refreshError: any) {
+            const refreshErrorCode = refreshError.response?.data?.code
+            // Jika refresh juga gagal karena token expired, redirect ke login
+            if (refreshErrorCode === 'TOKEN_EXPIRED') {
+              this.clearToken()
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('auth_message', 'Sesi Anda telah berakhir. Silakan login kembali.')
+                window.location.href = '/login'
+              }
             }
             return Promise.reject(refreshError)
           }

@@ -189,6 +189,20 @@ export default function DetailKaryaPage() {
                   <p className="font-semibold text-gray-900">{karya.tahun}</p>
                 </div>
 
+                {karya.nama && (
+                  <div>
+                    <p className="text-sm text-gray-600">Pembuat</p>
+                    <p className="font-semibold text-gray-900">{karya.nama}</p>
+                  </div>
+                )}
+
+                {karya.nip_nim && (
+                  <div>
+                    <p className="text-sm text-gray-600">NIP/NIM</p>
+                    <p className="font-semibold text-gray-900">{karya.nip_nim}</p>
+                  </div>
+                )}
+
                 {karya.deskripsi && (
                   <div>
                     <p className="text-sm text-gray-600">Deskripsi</p>

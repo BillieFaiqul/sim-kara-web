@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
 export default function LoginPage() {
@@ -13,10 +14,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) {
       router.push('/dashboard')
+    }
+
+    // Check untuk pesan session expired
+    const authMessage = typeof window !== 'undefined' ? localStorage.getItem('auth_message') : null
+    if (authMessage) {
+      setSessionExpired(true)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_message')
+      }
+      // Hilangkan pesan setelah 5 detik
+      setTimeout(() => setSessionExpired(false), 5000)
     }
   }, [isAuthenticated, router])
 
@@ -58,6 +72,13 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-5">
+          {/* Session Expired Message */}
+          {sessionExpired && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm">
+              ⚠️ Sesi Anda telah berakhir. Silakan login kembali.
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -85,14 +106,23 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-700"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-gray-700 pr-10"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           {/* Remember Me */}
@@ -116,19 +146,7 @@ export default function LoginPage() {
             {loading ? 'Loading...' : 'Login'}
           </button>
         </form>
-
-        {/* Demo Info */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-600 text-center mb-3">
-            Test Accounts (Password: password123)
-          </p>
-          <div className="bg-gray-50 p-3 rounded text-xs text-gray-700 space-y-2">
-            <p><strong>Admin:</strong> admin@simkara.com</p>
-            <p><strong>Dosen:</strong> ahmad@simkara.com</p>
-            <p><strong>Mahasiswa:</strong> billie@simkara.com</p>
-          </div>
-        </div>
-
+        
         {/* Back Link */}
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-blue-600 hover:text-blue-700">

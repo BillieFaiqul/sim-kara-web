@@ -5,6 +5,7 @@ import { Eye, Trash2, Search, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
 import { karyaAPI, type Karya } from '@/lib/karya-api'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 export default function SemuaKaryaPage() {
   const { user } = useAuth()
@@ -13,6 +14,21 @@ export default function SemuaKaryaPage() {
   const [karyaList, setKaryaList] = useState<Karya[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+  const [modal, setModal] = useState<{
+    isOpen: boolean
+    type: 'confirm' | 'success' | 'error'
+    title: string
+    message: string
+    action?: () => void
+    destructive?: boolean
+  }>({
+    isOpen: false,
+    type: 'confirm',
+    title: '',
+    message: '',
+    destructive: false,
+  })
 
   useEffect(() => {
     loadKarya()
@@ -77,20 +93,46 @@ export default function SemuaKaryaPage() {
     rejected: 'Rejected',
   }
 
+  const confirmDeleteKarya = (id: number) => {
+    setModal({
+      isOpen: true,
+      type: 'confirm',
+      title: 'Hapus Karya?',
+      message: 'Apakah Anda yakin ingin menghapus karya ini? Tindakan ini tidak dapat dibatalkan.',
+      destructive: true,
+      action: () => handleDelete(id),
+    })
+  }
+
   const handleDelete = async (id: number) => {
-    if (confirm('Apakah Anda yakin ingin menghapus karya ini?')) {
-      try {
-        await karyaAPI.delete(id)
-        setKaryaList(karyaList.filter(k => k.id !== id))
-        alert('Karya berhasil dihapus')
-      } catch (err: any) {
-        alert(err?.response?.data?.message || 'Gagal menghapus karya')
-      }
+    try {
+      setActionLoading(true)
+      await karyaAPI.delete(id)
+      setKaryaList(karyaList.filter(k => k.id !== id))
+      setModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Berhasil',
+        message: 'Karya berhasil dihapus',
+        destructive: false,
+      })
+    } catch (err: any) {
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: err?.response?.data?.message || 'Gagal menghapus karya',
+        destructive: false,
+      })
+    } finally {
+      setActionLoading(false)
     }
   }
 
-  // Check if user can delete (only admin)
-  const canDelete = user?.role === 'admin'
+  // Check if user can delete (only admin, only verified/rejected)
+  const canDelete = (karya: Karya) => {
+    return user?.role === 'admin' && (karya.status === 'verified' || karya.status === 'rejected')
+  }
 
   return (
     <div className="space-y-6">
@@ -179,12 +221,12 @@ export default function SemuaKaryaPage() {
                       </div>
                     </td>
 
-                    {/* Pembuat + Role */}
+                    {/* Pembuat + NIP/NIM */}
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{karya.user?.name}</p>
+                        <p className="text-sm font-medium text-gray-900">{karya.nama || karya.user?.name}</p>
                         <p className="text-xs text-gray-500">
-                          {karya.user?.role}
+                          {karya.nip_nim || karya.user?.role}
                         </p>
                       </div>
                     </td>
@@ -223,11 +265,12 @@ export default function SemuaKaryaPage() {
                           </button>
                         </Link>
 
-                        {/* Delete - Only for admin */}
-                        {canDelete && (
+                        {/* Delete - Only for admin, only verified/rejected */}
+                        {canDelete(karya) && (
                           <button
-                            onClick={() => handleDelete(karya.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            onClick={() => confirmDeleteKarya(karya.id)}
+                            disabled={actionLoading}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
                             title="Hapus"
                           >
                             <Trash2 size={18} />
@@ -246,6 +289,26 @@ export default function SemuaKaryaPage() {
           </div>
         )}
       </div>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={modal.isOpen}
+        type={modal.type as any}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.type === 'confirm' ? 'Hapus' : 'OK'}
+        cancelText={modal.type === 'error' || modal.type === 'success' ? 'Tutup' : 'Batal'}
+        destructive={modal.destructive}
+        loading={actionLoading}
+        onConfirm={() => {
+          if (modal.action) {
+            modal.action()
+          } else {
+            setModal({ ...modal, isOpen: false })
+          }
+        }}
+        onCancel={() => setModal({ ...modal, isOpen: false })}
+      />
     </div>
   )
 }

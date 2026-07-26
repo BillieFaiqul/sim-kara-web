@@ -17,10 +17,32 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    // Handle token expired (401 response)
+    if (error.response?.status === 401) {
+      const errorCode = error.response?.data?.code
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user')
+        localStorage.setItem('auth_message', 'Sesi Anda telah berakhir. Silakan login kembali.')
+        // Redirect ke login
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login'
+        }
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 export interface Karya {
   id: number
   user_id: number
   judul: string
+  nama?: string
+  nip_nim?: string
   jenis: string
   level: string
   tahun: number
@@ -113,6 +135,9 @@ class KaryaAPI {
       tahun: number
       deskripsi: string
       file_path: string
+      file_pendukung_path: string
+      status: string
+      pencapaian: string
     }>
   ): Promise<{ success: boolean; message: string; data: Karya }> {
     return api.put(`/karya/${id}`, data).then((res) => res.data)
@@ -126,8 +151,13 @@ class KaryaAPI {
     return api.delete(`/karya/${id}`).then((res) => res.data)
   }
 
-  getStats(): Promise<StatsResponse> {
-    return api.get('/karya-stats').then((res) => res.data)
+  getStats(tahun?: number): Promise<StatsResponse> {
+    const query = new URLSearchParams()
+    if (tahun) {
+      query.append('tahun', tahun.toString())
+    }
+    const url = `/karya-stats${query.toString() ? '?' + query.toString() : ''}`
+    return api.get(url).then((res) => res.data)
   }
 
   uploadFile(formData: FormData): Promise<{ file_path: string; url: string }> {
@@ -140,6 +170,8 @@ class KaryaAPI {
 
   createWithPath(data: {
     judul: string
+    nama?: string
+    nip_nim?: string
     jenis: string
     level: string
     tahun: number
@@ -155,6 +187,14 @@ class KaryaAPI {
     return api.get(`/karya/${id}/download`, {
       responseType: 'blob',
     }).then((res) => res.data)
+  }
+
+  approve(id: number): Promise<{ success: boolean; message: string; data: Karya }> {
+    return api.post(`/karya/${id}/approve`, {}).then((res) => res.data)
+  }
+
+  reject(id: number, alasan_reject: string): Promise<{ success: boolean; message: string; data: Karya }> {
+    return api.post(`/karya/${id}/reject`, { alasan_reject }).then((res) => res.data)
   }
 }
 

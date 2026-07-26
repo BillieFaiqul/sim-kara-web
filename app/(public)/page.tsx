@@ -10,6 +10,8 @@ interface RecentKarya {
   id: number
   judul: string
   jenis: string
+  nama?: string
+  nip_nim?: string
   user?: { name: string; role: string }
   tahun: number
   icon: string
@@ -21,15 +23,25 @@ export default function Home() {
   const [stats, setStats] = useState<Record<string, number>>({})
   const [chartData, setChartData] = useState<Array<{name: string; value: number}>>([])
   const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+
+  useEffect(() => {
+    // Generate tahun dari 50 tahun yang lalu sampai sekarang
+    const currentYear = new Date().getFullYear()
+    const startYear = currentYear - 50
+    const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => startYear + i)
+    setAvailableYears(years.reverse())
+  }, [])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [selectedYear])
 
   const loadData = async () => {
     try {
       // Get stats
-      const statsData = await karyaAPI.getStats()
+      const statsData = await karyaAPI.getStats(selectedYear)
       setStats(statsData.stats)
       setChartData(statsData.chart_data)
 
@@ -39,10 +51,12 @@ export default function Home() {
         id: k.id,
         judul: k.judul,
         jenis: k.jenis,
+        nama: k.nama,
+        nip_nim: k.nip_nim,
         user: k.user,
         tahun: k.tahun,
         icon: getIconForJenis(k.jenis),
-        authorDisplay: k.user ? `${k.user.name} - ${k.user.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}` : 'Unknown',
+        authorDisplay: k.nama ? `${k.nama} (${k.nip_nim || 'N/A'})` : k.user ? `${k.user.name} - ${k.user.role === 'dosen' ? 'Dosen' : 'Mahasiswa'}` : 'Unknown',
       }))
       setRecentKarya(transformed)
     } catch (error) {
@@ -123,9 +137,22 @@ export default function Home() {
 
           {/* Chart - Real-time */}
           <div className="bg-gray-50 p-8 rounded-lg max-w-4xl mx-auto">
-            <h4 className="text-xl font-bold mb-6 text-center text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              Distribusi Karya per Kategori
-            </h4>
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-xl font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                Distribusi Karya per Kategori
+              </h4>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900 bg-white font-medium"
+              >
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
             {loading ? (
               <div className="h-80 flex items-center justify-center text-gray-500">Loading chart...</div>
             ) : chartData.length > 0 ? (

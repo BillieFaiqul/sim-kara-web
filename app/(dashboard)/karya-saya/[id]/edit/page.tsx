@@ -13,6 +13,8 @@ interface FormData {
   level: string
   pencapaian: string
   deskripsi: string
+  nama?: string
+  nip_nim?: string
 }
 
 interface LevelConfig {
@@ -133,6 +135,8 @@ export default function EditKaryaPage() {
         level: data.level,
         pencapaian: data.pencapaian || '',
         deskripsi: data.deskripsi || '',
+        nama: data.nama || '',
+        nip_nim: data.nip_nim || '',
       })
       setUploadedFilePath(data.file_path || '')
       setUploadedPendukungPath(data.file_pendukung_path || '')
@@ -245,15 +249,22 @@ export default function EditKaryaPage() {
     try {
       setActionLoading(true)
 
-      const submitData = {
+      const submitData: any = {
         judul: formData.judul,
         jenis: formData.jenis,
         level: formData.level,
         pencapaian: formData.pencapaian,
         tahun: formData.tahun,
         deskripsi: formData.deskripsi,
+        nama: formData.nama,
+        nip_nim: formData.nip_nim,
         file_path: uploadedFilePath || undefined,
         file_pendukung_path: uploadedPendukungPath || undefined,
+      }
+
+      // Jika karya di-reject, reset ke draft saat diedit
+      if (karya.status === 'rejected') {
+        submitData.status = 'draft'
       }
 
       await karyaAPI.update(karya.id, submitData)
@@ -261,7 +272,9 @@ export default function EditKaryaPage() {
         isOpen: true,
         type: 'success',
         title: 'Berhasil',
-        message: 'Karya berhasil diupdate',
+        message: karya.status === 'rejected'
+          ? 'Karya berhasil diupdate dan kembali ke status Draft. Silakan submit kembali untuk validasi.'
+          : 'Karya berhasil diupdate',
         action: () => router.push('/karya-saya'),
       })
     } catch (err: any) {
@@ -392,6 +405,31 @@ export default function EditKaryaPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-black mb-2">Nama Pembuat</label>
+                  <input
+                    type="text"
+                    name="nama"
+                    value={formData.nama}
+                    onChange={handleInputChange}
+                    placeholder="Nama penulis/pembuat karya"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-black mb-2">NIP/NIM</label>
+                  <input
+                    type="text"
+                    name="nip_nim"
+                    value={formData.nip_nim}
+                    onChange={handleInputChange}
+                    placeholder="NIP atau NIM penulis"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-black"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-black mb-2">Level *</label>
                   <select
                     name="level"
@@ -506,6 +544,17 @@ export default function EditKaryaPage() {
                 <div>
                   <p className="text-sm text-gray-800">Judul</p>
                   <p className="font-semibold text-gray-900">{formData.judul}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-800">Nama Pembuat</p>
+                    <p className="font-semibold text-gray-900">{formData.nama || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-800">NIP/NIM</p>
+                    <p className="font-semibold text-gray-900">{formData.nip_nim || '-'}</p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

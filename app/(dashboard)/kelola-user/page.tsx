@@ -1,17 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Edit, Trash2, Search, X } from 'lucide-react'
-
-interface User {
-  id: number
-  name: string
-  email: string
-  nip_nim: string
-  role: 'admin' | 'dosen' | 'mahasiswa'
-  is_active: boolean
-  created_at: string
-}
+import { useState, useEffect } from 'react'
+import { Plus, Edit, Trash2, Search, X, AlertCircle, Loader, Eye, EyeOff } from 'lucide-react'
+import { userAPI, User } from '@/lib/user-api'
 
 interface FormData {
   name: string
@@ -22,62 +13,30 @@ interface FormData {
   is_active: boolean
 }
 
+interface FormErrors {
+  [key: string]: string[]
+}
+
 export default function KolaUserPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'semua' | 'admin' | 'dosen' | 'mahasiswa'>('semua')
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      name: 'Admin Prodi',
-      email: 'admin@unesa.ac.id',
-      nip_nim: '1234567890',
-      role: 'admin',
-      is_active: true,
-      created_at: '2024-01-15',
-    },
-    {
-      id: 2,
-      name: 'Dr. Bambang Suryanto',
-      email: 'bambang@unesa.ac.id',
-      nip_nim: '1234567890',
-      role: 'dosen',
-      is_active: true,
-      created_at: '2024-02-10',
-    },
-    {
-      id: 3,
-      name: 'Ir. Siti Nurhasanah',
-      email: 'siti@unesa.ac.id',
-      nip_nim: '0987654321',
-      role: 'dosen',
-      is_active: true,
-      created_at: '2024-02-12',
-    },
-    {
-      id: 4,
-      name: 'Rina Wijaya',
-      email: 'rina@unesa.ac.id',
-      nip_nim: '210411100001',
-      role: 'mahasiswa',
-      is_active: true,
-      created_at: '2024-03-05',
-    },
-    {
-      id: 5,
-      name: 'Ahmad Hidayat',
-      email: 'ahmad@unesa.ac.id',
-      nip_nim: '210411100002',
-      role: 'mahasiswa',
-      is_active: false,
-      created_at: '2024-03-06',
-    },
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [showAddPassword, setShowAddPassword] = useState(false)
+  const [showChangePasswordNew, setShowChangePasswordNew] = useState(false)
+  const [showChangePasswordConfirm, setShowChangePasswordConfirm] = useState(false)
 
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -87,15 +46,29 @@ export default function KolaUserPage() {
     is_active: true,
   })
 
-  // Filter & Search
-  const filtered = users.filter(user => {
-    const matchFilter = filter === 'semua' || user.role === filter
-    const matchSearch =
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase()) ||
-      user.nip_nim.includes(search)
-    return matchFilter && matchSearch
-  })
+  // Fetch users
+  useEffect(() => {
+    fetchUsers()
+  }, [search, filter])
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await userAPI.getAll({
+        search: search || undefined,
+        role: filter === 'semua' ? undefined : filter,
+      })
+      setUsers(response.data)
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Gagal mengambil data user'
+      setError(message)
+      console.error('Error fetching users:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
 
   // Handle Add
   const handleAddClick = () => {
@@ -107,25 +80,47 @@ export default function KolaUserPage() {
       password: '',
       is_active: true,
     })
+    setError(null)
+    setFormErrors({})
+    setShowAddPassword(false)
     setShowAddModal(true)
   }
 
-  const handleAddSubmit = () => {
+  const handleAddSubmit = async () => {
     if (!formData.name || !formData.email || !formData.nip_nim || !formData.password) {
-      alert('Semua field harus diisi')
+      setError('Semua field harus diisi')
       return
     }
 
-    const newUser: User = {
-      id: Math.max(...users.map(u => u.id), 0) + 1,
-      ...formData,
-      password: undefined as any,
-      created_at: new Date().toISOString().split('T')[0],
+    try {
+      setSubmitting(true)
+      setError(null)
+      setFormErrors({})
+      await userAPI.create({
+        name: formData.name,
+        email: formData.email,
+        nip_nim: formData.nip_nim,
+        password: formData.password,
+        role: formData.role,
+        is_active: formData.is_active,
+      })
+      setShowAddModal(false)
+      setError(null)
+      setFormErrors({})
+      await fetchUsers()
+    } catch (err: any) {
+      const errorData = err.response?.data
+      if (errorData?.errors) {
+        setFormErrors(errorData.errors)
+        const firstError = Object.values(errorData.errors)[0]
+        setError(Array.isArray(firstError) ? firstError[0] : 'Gagal menambahkan user')
+      } else {
+        const message = errorData?.message || 'Gagal menambahkan user'
+        setError(message)
+      }
+    } finally {
+      setSubmitting(false)
     }
-
-    setUsers([...users, newUser])
-    setShowAddModal(false)
-    alert('User berhasil ditambahkan')
   }
 
   // Handle Edit
@@ -136,33 +131,50 @@ export default function KolaUserPage() {
       email: user.email,
       nip_nim: user.nip_nim,
       role: user.role,
+      password: '',
       is_active: user.is_active,
     })
+    setError(null)
+    setFormErrors({})
     setShowEditModal(true)
   }
 
-  const handleEditSubmit = () => {
+  const handleEditSubmit = async () => {
     if (!formData.name || !formData.email || !formData.nip_nim) {
-      alert('Semua field harus diisi')
+      setError('Semua field harus diisi')
       return
     }
 
-    setUsers(
-      users.map(u =>
-        u.id === selectedUser?.id
-          ? {
-              ...u,
-              name: formData.name,
-              email: formData.email,
-              nip_nim: formData.nip_nim,
-              role: formData.role,
-              is_active: formData.is_active,
-            }
-          : u
-      )
-    )
-    setShowEditModal(false)
-    alert('User berhasil diupdate')
+    if (!selectedUser) return
+
+    try {
+      setSubmitting(true)
+      setError(null)
+      setFormErrors({})
+      await userAPI.update(selectedUser.id, {
+        name: formData.name,
+        email: formData.email,
+        nip_nim: formData.nip_nim,
+        role: formData.role,
+        is_active: formData.is_active,
+      })
+      setShowEditModal(false)
+      setError(null)
+      setFormErrors({})
+      await fetchUsers()
+    } catch (err: any) {
+      const errorData = err.response?.data
+      if (errorData?.errors) {
+        setFormErrors(errorData.errors)
+        const firstError = Object.values(errorData.errors)[0]
+        setError(Array.isArray(firstError) ? firstError[0] : 'Gagal mengupdate user')
+      } else {
+        const message = errorData?.message || 'Gagal mengupdate user'
+        setError(message)
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // Handle Delete
@@ -171,10 +183,77 @@ export default function KolaUserPage() {
     setShowDeleteConfirm(true)
   }
 
-  const handleDeleteConfirm = () => {
-    setUsers(users.filter(u => u.id !== selectedUser?.id))
-    setShowDeleteConfirm(false)
-    alert('User berhasil dihapus')
+  const handleDeleteConfirm = async () => {
+    if (!selectedUser) return
+
+    try {
+      setSubmitting(true)
+      await userAPI.delete(selectedUser.id)
+      setShowDeleteConfirm(false)
+      setError(null)
+      await fetchUsers()
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Gagal menghapus user'
+      setError(message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleChangePasswordClick = (user: User) => {
+    setSelectedUser(user)
+    setNewPassword('')
+    setConfirmPassword('')
+    setError(null)
+    setFormErrors({})
+    setShowChangePasswordNew(false)
+    setShowChangePasswordConfirm(false)
+    setShowChangePasswordModal(true)
+  }
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      setError('Password dan konfirmasi password harus diisi')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Password tidak cocok')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setError('Password minimal 8 karakter')
+      return
+    }
+
+    if (!selectedUser) return
+
+    try {
+      setSubmitting(true)
+      setError(null)
+      setFormErrors({})
+      await userAPI.update(selectedUser.id, {
+        password: newPassword,
+      })
+      setShowChangePasswordModal(false)
+      setNewPassword('')
+      setConfirmPassword('')
+      setError(null)
+      await fetchUsers()
+    } catch (err: any) {
+      const errorData = err.response?.data
+      if (errorData?.errors) {
+        setFormErrors(errorData.errors)
+        const firstError = Object.values(errorData.errors)[0]
+        setError(Array.isArray(firstError) ? firstError[0] : 'Gagal mengubah password')
+      } else {
+        const message = errorData?.message || 'Gagal mengubah password'
+        setError(message)
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const roleLabel = {
@@ -234,22 +313,41 @@ export default function KolaUserPage() {
         </div>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3">
+          <AlertCircle className="text-red-600 flex-shrink-0" size={20} />
+          <div>
+            <p className="text-sm font-medium text-red-800">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nama</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">NIP/NIM</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filtered.map(user => (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <Loader className="animate-spin text-blue-600" size={32} />
+              <p className="text-gray-600">Memuat data user...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nama</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">NIP/NIM</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {users.map(user => (
                 <tr key={user.id} className="hover:bg-gray-50 transition">
                   <td className="px-6 py-4">
                     <p className="font-medium text-gray-900">{user.name}</p>
@@ -280,13 +378,23 @@ export default function KolaUserPage() {
                       <button
                         onClick={() => handleEditClick(user)}
                         className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                        title="Edit user"
                       >
                         <Edit size={18} />
+                      </button>
+                      {/* Change Password */}
+                      <button
+                        onClick={() => handleChangePasswordClick(user)}
+                        className="px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="Ubah password"
+                      >
+                        Ubah Password
                       </button>
                       {/* Delete */}
                       <button
                         onClick={() => handleDeleteClick(user)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Hapus user"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -294,21 +402,22 @@ export default function KolaUserPage() {
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
 
-        {/* Empty State */}
-        {filtered.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Tidak ada user yang sesuai</p>
+            {/* Empty State */}
+            {users.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Tidak ada user yang sesuai</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* ADD MODAL */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Tambah User</h2>
@@ -326,10 +435,14 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama *</label>
                 <input
                   type="text"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.name ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="Masukkan nama lengkap"
                 />
+                {formErrors.name && <p className="text-sm text-red-600 mt-1">{formErrors.name[0]}</p>}
               </div>
 
               {/* Email */}
@@ -337,10 +450,14 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
-                  value={formData.email}
+                  value={formData.email || ''}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.email ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="nama@email.com"
                 />
+                {formErrors.email && <p className="text-sm text-red-600 mt-1">{formErrors.email[0]}</p>}
               </div>
 
               {/* NIP/NIM */}
@@ -348,35 +465,55 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">NIP/NIM *</label>
                 <input
                   type="text"
-                  value={formData.nip_nim}
+                  value={formData.nip_nim || ''}
                   onChange={(e) => setFormData({ ...formData, nip_nim: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.nip_nim ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="Nomor Induk Pegawai/Mahasiswa"
                 />
+                {formErrors.nip_nim && <p className="text-sm text-red-600 mt-1">{formErrors.nip_nim[0]}</p>}
               </div>
 
               {/* Role */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
                 <select
-                  value={formData.role}
+                  value={formData.role || 'mahasiswa'}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.role ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
                 >
                   <option value="mahasiswa">Mahasiswa</option>
                   <option value="dosen">Dosen</option>
                   <option value="admin">Admin</option>
                 </select>
+                {formErrors.role && <p className="text-sm text-red-600 mt-1">{formErrors.role[0]}</p>}
               </div>
 
               {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <div className="relative">
+                  <input
+                    type={showAddPassword ? 'text' : 'password'}
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 pr-10 ${
+                      formErrors.password ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                    }`}
+                    placeholder="Minimal 8 karakter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPassword(!showAddPassword)}
+                    className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+                  >
+                    {showAddPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {formErrors.password && <p className="text-sm text-red-600 mt-1">{formErrors.password[0]}</p>}
               </div>
 
               {/* Status */}
@@ -398,15 +535,24 @@ export default function KolaUserPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 onClick={handleAddSubmit}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Tambah
+                {submitting ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Menambah...
+                  </>
+                ) : (
+                  'Tambah'
+                )}
               </button>
             </div>
           </div>
@@ -415,7 +561,7 @@ export default function KolaUserPage() {
 
       {/* EDIT MODAL */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900">Edit User</h2>
@@ -433,10 +579,14 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nama *</label>
                 <input
                   type="text"
-                  value={formData.name}
+                  value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.name ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="Masukkan nama lengkap"
                 />
+                {formErrors.name && <p className="text-sm text-red-600 mt-1">{formErrors.name[0]}</p>}
               </div>
 
               {/* Email */}
@@ -444,10 +594,14 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
-                  value={formData.email}
+                  value={formData.email || ''}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.email ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="nama@email.com"
                 />
+                {formErrors.email && <p className="text-sm text-red-600 mt-1">{formErrors.email[0]}</p>}
               </div>
 
               {/* NIP/NIM */}
@@ -455,24 +609,31 @@ export default function KolaUserPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">NIP/NIM *</label>
                 <input
                   type="text"
-                  value={formData.nip_nim}
+                  value={formData.nip_nim || ''}
                   onChange={(e) => setFormData({ ...formData, nip_nim: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.nip_nim ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
+                  placeholder="Nomor Induk Pegawai/Mahasiswa"
                 />
+                {formErrors.nip_nim && <p className="text-sm text-red-600 mt-1">{formErrors.nip_nim[0]}</p>}
               </div>
 
               {/* Role */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
                 <select
-                  value={formData.role}
+                  value={formData.role || 'mahasiswa'}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 ${
+                    formErrors.role ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                  }`}
                 >
                   <option value="mahasiswa">Mahasiswa</option>
                   <option value="dosen">Dosen</option>
                   <option value="admin">Admin</option>
                 </select>
+                {formErrors.role && <p className="text-sm text-red-600 mt-1">{formErrors.role[0]}</p>}
               </div>
 
               {/* Status */}
@@ -494,15 +655,24 @@ export default function KolaUserPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 onClick={handleEditSubmit}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Update
+                {submitting ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Mengupdate...
+                  </>
+                ) : (
+                  'Update'
+                )}
               </button>
             </div>
           </div>
@@ -511,7 +681,7 @@ export default function KolaUserPage() {
 
       {/* DELETE CONFIRMATION MODAL */}
       {showDeleteConfirm && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
@@ -527,15 +697,115 @@ export default function KolaUserPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50"
               >
                 Batal
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Hapus
+                {submitting ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Menghapus...
+                  </>
+                ) : (
+                  'Hapus'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGE PASSWORD MODAL */}
+      {showChangePasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Ubah Password</h2>
+              <button
+                onClick={() => setShowChangePasswordModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">Mengubah password untuk: <strong>{selectedUser.name}</strong></p>
+
+            <div className="space-y-4">
+              {/* Password Baru */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password Baru *</label>
+                <div className="relative">
+                  <input
+                    type={showChangePasswordNew ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 pr-10 ${
+                      formErrors.password ? 'border-red-500 focus:ring-red-600' : 'border-gray-300 focus:ring-blue-600'
+                    }`}
+                    placeholder="Minimal 8 karakter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChangePasswordNew(!showChangePasswordNew)}
+                    className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+                  >
+                    {showChangePasswordNew ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {formErrors.password && <p className="text-sm text-red-600 mt-1">{formErrors.password[0]}</p>}
+              </div>
+
+              {/* Konfirmasi Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Konfirmasi Password *</label>
+                <div className="relative">
+                  <input
+                    type={showChangePasswordConfirm ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900 pr-10"
+                    placeholder="Ulangi password baru"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowChangePasswordConfirm(!showChangePasswordConfirm)}
+                    className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
+                  >
+                    {showChangePasswordConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowChangePasswordModal(false)}
+                disabled={submitting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={submitting}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader size={16} className="animate-spin" />
+                    Mengubah...
+                  </>
+                ) : (
+                  'Ubah Password'
+                )}
               </button>
             </div>
           </div>

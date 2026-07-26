@@ -29,6 +29,58 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const getMenuByRole = (role: string): MenuItem[] => {
+  const baseMenu: MenuItem[] = [
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      icon: 'Home',
+    },
+    {
+      label: 'Semua Karya',
+      href: '/semua-karya',
+      icon: 'FileText',
+    },
+  ]
+
+  const adminMenu: MenuItem[] = [
+    ...baseMenu,
+    {
+      label: 'Validasi',
+      href: '/validasi',
+      icon: 'CheckSquare',
+      submenu: [
+        {
+          label: 'Validasi Pending',
+          href: '/validasi/pending',
+          icon: 'Clock',
+        },
+        {
+          label: 'Riwayat Validasi',
+          href: '/validasi/riwayat',
+          icon: 'History',
+        },
+      ],
+    },
+    {
+      label: 'Kelola User',
+      href: '/kelola-user',
+      icon: 'Users',
+    },
+  ]
+
+  const userMenu: MenuItem[] = [
+    ...baseMenu,
+    {
+      label: 'Karya Saya',
+      href: '/karya-saya',
+      icon: 'BookOpen',
+    },
+  ]
+
+  return role === 'admin' ? adminMenu : userMenu
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -36,6 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuth()
+    // Check untuk pesan auth (e.g., token expired)
+    const authMessage = typeof window !== 'undefined' ? localStorage.getItem('auth_message') : null
+    if (authMessage) {
+      console.log('Auth Message:', authMessage)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_message')
+      }
+    }
   }, [])
 
   const checkAuth = async () => {
@@ -44,9 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const response = await authAPI.getCurrentUser()
         setUser(response.user)
+        // Generate menu berdasarkan role user
+        setMenuItems(getMenuByRole(response.user.role))
       } catch (error) {
         authAPI.clearToken()
         setUser(null)
+        setMenuItems([])
       }
     }
     setIsLoading(false)
@@ -58,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await authAPI.login({ email, password })
       authAPI.saveToken(response.token)
       setUser(response.user)
-      setMenuItems(response.menu_items || [])
+      // Gunakan menu dari response atau generate berdasarkan role
+      setMenuItems(response.menu_items || getMenuByRole(response.user.role))
     } catch (error) {
       setIsLoading(false)
       throw error
