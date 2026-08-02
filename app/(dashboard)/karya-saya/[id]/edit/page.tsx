@@ -191,7 +191,7 @@ export default function EditKaryaPage() {
         const formDataKarya = new FormData()
         formDataKarya.append('file', fileKaryaInput.files[0])
         const responseKarya = await karyaAPI.uploadFile(formDataKarya)
-        setUploadedFilePath(responseKarya.file_path || responseKarya.data.file_path)
+        setUploadedFilePath(responseKarya.file_path)
       }
 
       // Upload File Pendukung jika ada file baru
@@ -199,7 +199,7 @@ export default function EditKaryaPage() {
         const formDataPendukung = new FormData()
         formDataPendukung.append('file', filePendukungInput.files[0])
         const responsePendukung = await karyaAPI.uploadFile(formDataPendukung)
-        setUploadedPendukungPath(responsePendukung.file_path || responsePendukung.data.file_path)
+        setUploadedPendukungPath(responsePendukung.file_path)
       }
 
       setUploading(false)
@@ -275,8 +275,8 @@ export default function EditKaryaPage() {
         message: karya.status === 'rejected'
           ? 'Karya berhasil diupdate dan kembali ke status Draft. Silakan submit kembali untuk validasi.'
           : 'Karya berhasil diupdate',
-        action: () => router.push('/karya-saya'),
       })
+      setTimeout(() => router.push('/karya-saya'), 1500)
     } catch (err: any) {
       setModal({
         isOpen: true,

@@ -207,7 +207,7 @@ export default function TambahKaryaPage() {
           formDataPendukung.append('file', filePendukungInput.files[0])
           const responsePendukung = await karyaAPI.uploadFile(formDataPendukung)
           console.log('Pendukung response:', responsePendukung)
-          const pendukungPath = responsePendukung?.file_path || responsePendukung?.data?.file_path
+          const pendukungPath = responsePendukung?.file_path
           if (pendukungPath) {
             setUploadedPendukungPath(pendukungPath)
             console.log('Pendukung path saved:', pendukungPath)
