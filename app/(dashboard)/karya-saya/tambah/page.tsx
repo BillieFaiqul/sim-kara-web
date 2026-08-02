@@ -198,7 +198,7 @@ export default function TambahKaryaPage() {
       const formDataKarya = new FormData()
       formDataKarya.append('file', fileKaryaInput.files[0])
       const responseKarya = await karyaAPI.uploadFile(formDataKarya)
-      setUploadedFilePath(responseKarya.file_path || responseKarya.data.file_path)
+      setUploadedFilePath(responseKarya.file_path)
 
       // Upload File Pendukung (jika ada)
       if (filePendukungInput && filePendukungInput.files && filePendukungInput.files.length > 0) {
