@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<StatItem[]>([])
   const [chartData, setChartData] = useState<ChartDataItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [availableYears, setAvailableYears] = useState<number[]>([])
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const loadStats = async () => {
     try {
       setLoading(true)
-      const response = await karyaAPI.getStats(selectedYear)
+      const response = await karyaAPI.getStats(selectedYear || undefined)
 
       const iconMap: Record<string, string> = {
         publikasi: '📄',
@@ -110,10 +110,11 @@ export default function DashboardPage() {
               Distribusi Karya per Kategori
             </h2>
             <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              value={selectedYear || ''}
+              onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
               className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900 bg-white"
             >
+              <option value="">Semua Tahun</option>
               {availableYears.map((year) => (
                 <option key={year} value={year}>
                   {year}
