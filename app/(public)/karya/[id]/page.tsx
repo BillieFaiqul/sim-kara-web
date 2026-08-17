@@ -69,7 +69,9 @@ export default function PublicKaryaDetailPage() {
     if (!filePath) return
 
     const fileName = filePath.split('/').pop() || 'file'
-    const downloadUrl = `http://localhost:8000/storage/${filePath}`
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+    const baseUrl = apiUrl.replace('/api', '')
+    const downloadUrl = `${baseUrl}/storage/${filePath}`
     const link = document.createElement('a')
     link.href = downloadUrl
     link.download = fileName
@@ -297,7 +299,9 @@ function FilePreview({ filePath, fileName }: FilePreviewProps) {
   }
 
   const fileType = getFileType()
-  const fileUrl = `http://localhost:8000/storage/${filePath}`
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const baseUrl = apiUrl.replace('/api', '')
+  const fileUrl = `${baseUrl}/storage/${filePath}`
 
   useEffect(() => {
     setLoading(false)
