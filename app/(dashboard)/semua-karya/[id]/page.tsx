@@ -69,7 +69,7 @@ export default function DetailKaryaPage() {
     const fileName = filePath.split('/').pop() || 'file'
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sim-kara-backend.onrender.com/api'
     const baseUrl = apiUrl.replace('/api', '')
-    const downloadUrl = `${baseUrl}/storage/${filePath}`
+    const downloadUrl = filePath.startsWith('http') ? filePath : `${baseUrl}/storage/${filePath}`
     const link = document.createElement('a')
     link.href = downloadUrl
     link.download = fileName
@@ -302,7 +302,7 @@ function FilePreview({ filePath, fileName }: FilePreviewProps) {
   const fileType = getFileType()
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sim-kara-backend.onrender.com/api'
   const baseUrl = apiUrl.replace('/api', '')
-  const fileUrl = `${baseUrl}/storage/${filePath}`
+  const fileUrl = filePath.startsWith('http') ? filePath : `${baseUrl}/storage/${filePath}`
 
   useEffect(() => {
     setLoading(false)
