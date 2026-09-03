@@ -80,7 +80,9 @@ export default function DetailKaryaPage() {
     }
 
     // Download file langsung dari storage
-    const downloadUrl = `http://localhost:8000/storage/${filePath}`
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sim-kara-backend.onrender.com/api'
+    const baseUrl = apiUrl.replace('/api', '')
+    const downloadUrl = `${baseUrl}/storage/${filePath}`
     const link = document.createElement('a')
     link.href = downloadUrl
     link.download = fileName
@@ -313,7 +315,8 @@ function FilePreview({ filePath, fileName }: FilePreviewProps) {
   }
 
   const fileType = getFileType()
-  const fileUrl = `http://localhost:8000/storage/${filePath}`
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://sim-kara-backend.onrender.com/api'
+  const fileUrl = `${apiUrl.replace('/api', '')}/storage/${filePath}`
 
   useEffect(() => {
     setLoading(false)
